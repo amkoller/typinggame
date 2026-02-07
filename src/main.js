@@ -25,8 +25,8 @@ let paused = false;
 let stunUntil = 0; // timestamp when stun ends (miss penalty)
 
 function getSpawnInterval() {
-  // 2000ms at level 1, decreasing by 150ms per level, min 600ms
-  return Math.max(600, SPAWN_INTERVAL - (level - 1) * 150);
+  // 2000ms at level 1, decreasing by 75ms per level, min 800ms
+  return Math.max(800, SPAWN_INTERVAL - (level - 1) * 75);
 }
 
 // ── Draw helpers ───────────────────────────────────────────
@@ -90,41 +90,45 @@ function drawFlame(flame, tick) {
   flame.fill(0xf39c12);
 }
 
-function createMonster(letter) {
+function createMonster(word) {
   const container = new Container();
+  const letterCount = word.length;
+  // Scale the body wider for multi-letter monsters
+  const bodyHalfW = 18 + (letterCount - 1) * 10;
+  const bodyH = 38 + (letterCount - 1) * 6;
+  const bodyTop = -16 - (letterCount - 1) * 3;
+  const scale = 1 + (letterCount - 1) * 0.25;
 
   const body = new Graphics();
   // Body – orange rounded rectangle
-  body.roundRect(-18, -16, 36, 38, 8);
+  body.roundRect(-bodyHalfW, bodyTop, bodyHalfW * 2, bodyH, 8);
   body.fill(0xe67e22);
   // Feet
-  body.circle(-10, 24, 5);
-  body.circle(10, 24, 5);
+  body.circle(-10 * scale, bodyTop + bodyH + 2, 5 * scale);
+  body.circle(10 * scale, bodyTop + bodyH + 2, 5 * scale);
   body.fill(0xd35400);
   // Arms
-  body.roundRect(-28, -2, 12, 6, 3);
-  body.roundRect(16, -2, 12, 6, 3);
+  body.roundRect(-bodyHalfW - 12, -2, 12, 6 * scale, 3);
+  body.roundRect(bodyHalfW, -2, 12, 6 * scale, 3);
   body.fill(0xe67e22);
   // Eyes
-  body.circle(-7, -6, 5);
-  body.circle(7, -6, 5);
+  body.circle(-7 * scale, -6 - (letterCount - 1) * 2, 5);
+  body.circle(7 * scale, -6 - (letterCount - 1) * 2, 5);
   body.fill(0xffffff);
-  body.circle(-7, -6, 2.5);
-  body.circle(7, -6, 2.5);
+  body.circle(-7 * scale, -6 - (letterCount - 1) * 2, 2.5);
+  body.circle(7 * scale, -6 - (letterCount - 1) * 2, 2.5);
   body.fill(0x111111);
-  // Mouth – little open circle
-  body.circle(0, 6, 4);
+  // Mouth
+  body.circle(0, 6 - (letterCount - 1), 4);
   body.fill(0x111111);
 
   container.addChild(body);
 
   // Propeller beanie
   const beanie = new Graphics();
-  // Cap
-  beanie.arc(0, -16, 14, Math.PI, 0);
+  beanie.arc(0, bodyTop, 14 * scale, Math.PI, 0);
   beanie.fill(0x3498db);
-  // Nub on top
-  beanie.circle(0, -20, 3);
+  beanie.circle(0, bodyTop - 4, 3);
   beanie.fill(0xe74c3c);
   container.addChild(beanie);
 
@@ -132,42 +136,53 @@ function createMonster(letter) {
   const propeller = new Graphics();
   container.addChild(propeller);
 
-  // Letter bubble on shirt
-  const bubble = new Graphics();
-  bubble.circle(0, 12, 11);
-  bubble.fill(0xffffff);
-  bubble.circle(0, 12, 11);
-  bubble.stroke({ width: 1.5, color: 0xbdc3c7 });
-  container.addChild(bubble);
+  // Letter bubbles on shirt – spaced horizontally
+  const bubbleY = 14;
+  const spacing = 22;
+  const totalW = (letterCount - 1) * spacing;
+  const letterTexts = [];
 
-  const letterText = new Text({
-    text: letter,
-    style: new TextStyle({
-      fontFamily: "Arial",
-      fontSize: 14,
-      fontWeight: "bold",
-      fill: 0x2c3e50,
-    }),
-  });
-  letterText.anchor.set(0.5);
-  letterText.x = 0;
-  letterText.y = 12;
-  container.addChild(letterText);
+  for (let i = 0; i < letterCount; i++) {
+    const bx = -totalW / 2 + i * spacing;
+    const bubble = new Graphics();
+    bubble.circle(bx, bubbleY, 11);
+    bubble.fill(0xffffff);
+    bubble.circle(bx, bubbleY, 11);
+    bubble.stroke({ width: 1.5, color: 0xbdc3c7 });
+    container.addChild(bubble);
 
-  return { container, propeller, letter };
+    const lt = new Text({
+      text: word[i],
+      style: new TextStyle({
+        fontFamily: "Arial",
+        fontSize: 14,
+        fontWeight: "bold",
+        fill: 0x2c3e50,
+      }),
+    });
+    lt.anchor.set(0.5);
+    lt.x = bx;
+    lt.y = bubbleY;
+    container.addChild(lt);
+    letterTexts.push(lt);
+  }
+
+  return { container, propeller, word, letterTexts, hitIndex: 0, beanieY: bodyTop, propScale: scale };
 }
 
-function drawPropeller(propeller, tick) {
+function drawPropeller(propeller, tick, beanieY, scale) {
   propeller.clear();
   const angle = tick * 0.4;
-  const len = 16;
+  const by = beanieY ?? -20;
+  const s = scale ?? 1;
+  const len = 16 * s;
   // Two blades
   for (let i = 0; i < 2; i++) {
     const a = angle + i * Math.PI;
     const dx = Math.cos(a) * len;
-    const dy = Math.sin(a) * 3; // flatten to simulate rotation
-    propeller.moveTo(-dx, -20 - dy);
-    propeller.lineTo(dx, -20 + dy);
+    const dy = Math.sin(a) * 3;
+    propeller.moveTo(-dx, by - 4 - dy);
+    propeller.lineTo(dx, by - 4 + dy);
     propeller.stroke({ width: 3, color: 0x95a5a6 });
   }
 }
@@ -255,25 +270,54 @@ pauseText.visible = false;
 app.stage.addChild(pauseText);
 
 // ── Spawning ───────────────────────────────────────────────
+function getWordLength() {
+  // Level 1-10: always 1 letter
+  // Level 11-20: chance of 2-letter, increasing with level
+  // Level 21-30: chance of 3-letter, etc.
+  const maxLetters = Math.floor((level - 1) / 10) + 1;
+  if (maxLetters === 1) return 1;
+
+  // Within a tier (e.g. 11-20), chance of the longer word scales from 10% to 100%
+  const tierProgress = ((level - 1) % 10) / 9; // 0..1
+  const multiChance = 0.1 + tierProgress * 0.9;
+  if (Math.random() < multiChance) return maxLetters;
+  // Otherwise roll for any length from 1 to maxLetters-1
+  return Math.ceil(Math.random() * (maxLetters - 1));
+}
+
 function spawnMonster() {
   if (gameOver) return;
 
-  // Pick a letter not already active
-  const activeLetters = new Set(monsters.map((m) => m.letter));
-  const available = LETTERS.split("").filter((l) => !activeLetters.has(l));
+  const wordLen = getWordLength();
+
+  // Pick letters not already used as a first-letter on an active monster
+  const activeFirstLetters = new Set(
+    monsters.filter((m) => !m.dying).map((m) => m.word[m.hitIndex])
+  );
+  const available = LETTERS.split("").filter(
+    (l) => !activeFirstLetters.has(l)
+  );
   if (available.length === 0) return;
 
-  const letter = available[Math.floor(Math.random() * available.length)];
-  const m = createMonster(letter);
+  // Build a random word of the required length
+  let word = "";
+  const pool = [...LETTERS];
+  for (let i = 0; i < wordLen; i++) {
+    const src = i === 0 ? available : pool;
+    word += src[Math.floor(Math.random() * src.length)];
+  }
+
+  const m = createMonster(word);
 
   m.container.x = app.screen.width + 40;
   m.container.y = 60 + Math.random() * (app.screen.height - 140);
   m.dying = false;
   m.dyingVy = 0;
 
-  // Speed: both bounds grow with level
-  const minSpeed = MONSTER_SPEED + (level - 1) * 0.15;
-  const maxSpeed = MONSTER_SPEED + (level - 1) * 0.5;
+  // Speed: both bounds grow with level, capped at level 10 values
+  const speedLevel = Math.min(level, 10);
+  const minSpeed = MONSTER_SPEED + (speedLevel - 1) * 0.15;
+  const maxSpeed = MONSTER_SPEED + (speedLevel - 1) * 0.5;
   m.speed = minSpeed + Math.random() * (maxSpeed - minSpeed);
 
   app.stage.addChild(m.container);
@@ -322,14 +366,26 @@ window.addEventListener("keydown", (e) => {
   // Can't shoot while stunned
   if (Date.now() < stunUntil) return;
 
-  // Find the closest monster with this letter
+  // Count in-flight bullets per monster
+  const bulletsPerTarget = new Map();
+  for (const b of bullets) {
+    bulletsPerTarget.set(b.target, (bulletsPerTarget.get(b.target) || 0) + 1);
+  }
+
+  // Find the closest monster whose next needed letter matches,
+  // accounting for bullets already in flight
   const target = monsters
-    .filter((m) => m.letter === key && !m.dying)
+    .filter((m) => {
+      if (m.dying) return false;
+      const pending = bulletsPerTarget.get(m) || 0;
+      const nextIdx = m.hitIndex + pending;
+      return nextIdx < m.word.length && m.word[nextIdx] === key;
+    })
     .sort((a, b) => a.container.x - b.container.x)[0];
 
   if (!target) {
-    // Typed a wrong letter — stunned for 3 seconds
-    stunUntil = Date.now() + 3000;
+    // Typed a wrong letter — stunned for 300ms
+    stunUntil = Date.now() + 300;
     return;
   }
 
@@ -397,7 +453,7 @@ app.ticker.add((ticker) => {
   for (let i = monsters.length - 1; i >= 0; i--) {
     const m = monsters[i];
 
-    drawPropeller(m.propeller, tick);
+    drawPropeller(m.propeller, tick, m.beanieY, m.propScale);
 
     if (m.dying) {
       // Fall down
@@ -448,16 +504,32 @@ app.ticker.add((ticker) => {
 
     // Check if bullet reached target area
     if (dist < 20) {
-      // Hit!
-      score++;
-      scoreText.text = `Score: ${score}`;
-      const newLevel = Math.floor(score / 10) + 1;
-      if (newLevel !== level) {
-        level = newLevel;
-        levelText.text = `Level: ${level}`;
+      const t = b.target;
+
+      // If this monster is already dying or fully hit, discard the stale bullet
+      if (t.dying || t.hitIndex >= t.word.length) {
+        app.stage.removeChild(b.gfx);
+        bullets.splice(i, 1);
+        continue;
       }
-      b.target.dying = true;
-      b.target.dyingVy = -2;
+
+      // Grey out the hit letter
+      t.letterTexts[t.hitIndex].style.fill = 0xaaaaaa;
+      t.hitIndex++;
+
+      if (t.hitIndex >= t.word.length) {
+        // All letters hit — kill it
+        score++;
+        scoreText.text = `Score: ${score}`;
+        const newLevel = Math.floor(score / 10) + 1;
+        if (newLevel !== level) {
+          level = newLevel;
+          levelText.text = `Level: ${level}`;
+        }
+        t.dying = true;
+        t.dyingVy = -2;
+      }
+
       app.stage.removeChild(b.gfx);
       bullets.splice(i, 1);
       continue;
