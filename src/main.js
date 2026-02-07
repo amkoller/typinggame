@@ -31,19 +31,20 @@ let paused = false;
 let stunUntil = 0; // timestamp when stun ends (miss penalty)
 
 function getSpawnInterval() {
-  // 2000ms at level 1, decreasing by 30ms per level, min 1000ms
-  return Math.max(1000, SPAWN_INTERVAL - (level - 1) * 30);
+  // 2000ms at level 1, decreasing by 25ms per level, min 550ms
+  return Math.max(550, SPAWN_INTERVAL - (level - 1) * 25);
 }
 
 function getAvgLettersPerMonster() {
   // Tier 0 (levels 1-10): always 1 letter
   // Tier T≥1: base length T, chance of T+1 scales 10%→100% within the tier
-  // This guarantees monotonic increase across tier boundaries
+  // Capped at 5 to match max word length from word list
   const tier = Math.floor((level - 1) / 10);
   if (tier === 0) return 1;
   const tierProgress = ((level - 1) % 10) / 9;
   const upgradeChance = 0.1 + tierProgress * 0.9;
-  return tier + upgradeChance;
+  const avg = tier + upgradeChance;
+  return Math.min(avg, 5);
 }
 
 function getAvgSpeed() {
@@ -383,11 +384,13 @@ app.stage.addChild(pauseText);
 function getWordLength() {
   // Tier 0 (levels 1-10): always 1 letter
   // Tier T≥1: base length T, chance of T+1 scales 10%→100%
+  // Capped at 5 (max substring length from 5-letter word list)
   const tier = Math.floor((level - 1) / 10);
   if (tier === 0) return 1;
   const tierProgress = ((level - 1) % 10) / 9;
   const upgradeChance = 0.1 + tierProgress * 0.9;
-  return Math.random() < upgradeChance ? tier + 1 : tier;
+  const len = Math.random() < upgradeChance ? tier + 1 : tier;
+  return Math.min(len, 5);
 }
 
 function pickWord(wordLen) {
