@@ -19,8 +19,15 @@ const PLAYER_X = 100;
 let monsters = [];
 let score = 0;
 let lives = 3;
+let level = 1;
 let gameOver = false;
+let paused = false;
 let stunUntil = 0; // timestamp when stun ends (miss penalty)
+
+function getSpawnInterval() {
+  // 2000ms at level 1, decreasing by 150ms per level, min 600ms
+  return Math.max(600, SPAWN_INTERVAL - (level - 1) * 150);
+}
 
 // ── Draw helpers ───────────────────────────────────────────
 
@@ -212,6 +219,11 @@ livesText.x = 14;
 livesText.y = 42;
 app.stage.addChild(livesText);
 
+const levelText = new Text({ text: "Level: 1", style: uiStyle });
+levelText.x = 14;
+levelText.y = 70;
+app.stage.addChild(levelText);
+
 const gameOverText = new Text({
   text: "GAME OVER\nPress Space to restart",
   style: new TextStyle({
@@ -226,6 +238,21 @@ gameOverText.x = app.screen.width / 2;
 gameOverText.y = app.screen.height / 2;
 gameOverText.visible = false;
 app.stage.addChild(gameOverText);
+
+const pauseText = new Text({
+  text: "PAUSED\nPress Space to resume",
+  style: new TextStyle({
+    fontFamily: "monospace",
+    fontSize: 42,
+    fill: 0xecf0f1,
+    align: "center",
+  }),
+});
+pauseText.anchor.set(0.5);
+pauseText.x = app.screen.width / 2;
+pauseText.y = app.screen.height / 2;
+pauseText.visible = false;
+app.stage.addChild(pauseText);
 
 // ── Spawning ───────────────────────────────────────────────
 function spawnMonster() {
@@ -243,6 +270,11 @@ function spawnMonster() {
   m.container.y = 60 + Math.random() * (app.screen.height - 140);
   m.dying = false;
   m.dyingVy = 0;
+
+  // Speed: both bounds grow with level
+  const minSpeed = MONSTER_SPEED + (level - 1) * 0.15;
+  const maxSpeed = MONSTER_SPEED + (level - 1) * 0.5;
+  m.speed = minSpeed + Math.random() * (maxSpeed - minSpeed);
 
   app.stage.addChild(m.container);
   monsters.push(m);
@@ -275,6 +307,14 @@ window.addEventListener("keydown", (e) => {
     if (e.code === "Space") restartGame();
     return;
   }
+
+  if (e.code === "Space") {
+    paused = !paused;
+    pauseText.visible = paused;
+    return;
+  }
+
+  if (paused) return;
 
   const key = e.key.toUpperCase();
   if (key.length !== 1 || !LETTERS.includes(key)) return;
@@ -312,10 +352,14 @@ function restartGame() {
   bullets = [];
   score = 0;
   lives = 3;
+  level = 1;
   gameOver = false;
+  paused = false;
   stunUntil = 0;
   scoreText.text = "Score: 0";
+  pauseText.visible = false;
   livesText.text = "Lives: 3";
+  levelText.text = "Level: 1";
   gameOverText.visible = false;
   spawnTimer = 0;
 }
@@ -332,19 +376,20 @@ app.ticker.add((ticker) => {
   drawFlame(flame, tick);
 
   // Stun indicator
-  const stunned = Date.now() < stunUntil;
+  const stunned = !paused && Date.now() < stunUntil;
   stunText.visible = stunned;
   stunText.y = player.y - 60;
   if (stunned) {
     stunText.alpha = 0.6 + Math.sin(tick * 0.2) * 0.4;
   }
 
-  if (gameOver) return;
+  if (gameOver || paused) return;
 
   // Spawn timer
+  const interval = getSpawnInterval();
   spawnTimer += ticker.deltaMS;
-  if (spawnTimer >= SPAWN_INTERVAL) {
-    spawnTimer -= SPAWN_INTERVAL;
+  if (spawnTimer >= interval) {
+    spawnTimer -= interval;
     spawnMonster();
   }
 
@@ -367,7 +412,7 @@ app.ticker.add((ticker) => {
       }
     } else {
       // Float left
-      m.container.x -= MONSTER_SPEED * dt;
+      m.container.x -= m.speed * dt;
       // Gentle bob
       m.container.y += Math.sin(tick * 0.05 + i) * 0.3;
 
@@ -406,6 +451,11 @@ app.ticker.add((ticker) => {
       // Hit!
       score++;
       scoreText.text = `Score: ${score}`;
+      const newLevel = Math.floor(score / 10) + 1;
+      if (newLevel !== level) {
+        level = newLevel;
+        levelText.text = `Level: ${level}`;
+      }
       b.target.dying = true;
       b.target.dyingVy = -2;
       app.stage.removeChild(b.gfx);
