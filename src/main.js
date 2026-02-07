@@ -21,11 +21,11 @@ const SPAWN_INTERVAL = 2000; // ms
 const PLAYER_X = 100;
 const MAX_LEVEL = 60;
 const BOSS_LEVELS = {
-  10: { type: "skeleton", name: "SKELETON", wordCount: 7, wordLen: 3, speed: 0.9 },
-  20: { type: "ghost", name: "GHOST", wordCount: 8, wordLen: 4, speed: 0.75 },
-  30: { type: "shark", name: "LASER SHARK", wordCount: 12, wordLen: 4, speed: 0.6 },
-  40: { type: "demon", name: "FIRE DEMON", wordCount: 15, wordLen: 5, speed: 0.45 },
-  50: { type: "skull", name: "ZOMBIE SKULL", wordCount: 20, wordLen: 5, speed: 0.3 },
+  10: { type: "skeleton", name: "SKELETON", wordCount: 7, wordLen: 3, speed: 1.8 },
+  20: { type: "ghost", name: "GHOST", wordCount: 8, wordLen: 4, speed: 1.5 },
+  30: { type: "shark", name: "LASER SHARK", wordCount: 12, wordLen: 4, speed: 1.2 },
+  40: { type: "demon", name: "FIRE DEMON", wordCount: 15, wordLen: 5, speed: 0.9 },
+  50: { type: "skull", name: "ZOMBIE SKULL", wordCount: 20, wordLen: 5, speed: 0.6 },
 };
 
 let monsters = [];
@@ -752,6 +752,78 @@ function drawDemon(container) {
   return g;
 }
 
+function drawSkull(container) {
+  const g = new Graphics();
+  const px = 6; // extra large pixels for final boss
+  const top = -105;
+
+  // 22-wide × 24-tall pixel grid — massive zombie skull
+  const data = [
+    "      BBBBBBBBBB      ",
+    "    BBBBBBBBBBBBBB    ",
+    "   BBRBBBBBBBBBRBB   ",
+    "  BBBBBCBBBBBBCBBBBB  ",
+    "  BBBBBBBBBBBBBBBBBB  ",
+    "  BBBBBBBBBBBBBBBBBB  ",
+    " BBEEEEBBBBBBBBEEEEBB ",
+    " BBEGGEBBBBBBBBEGGEBB ",
+    " BBEEEEBBBBBBBBEEEEBB ",
+    "  BBBBBBBBBBBBBBBBBB  ",
+    "  BBBBBBBBBBBBBBBBBB  ",
+    "  BBBBBBBBNNBBBBBBBB  ",
+    "  BBBBBBBNNNNBBBBBBB  ",
+    "  BBBBBBBBNNBBBBBBBB  ",
+    " DDBBBBBBBBBBBBBBBBDD ",
+    " TTTTTTTTTTTTTTTTTTTT ",
+    " TMTMTMTMTMTMTMTMTMTM",
+    "  TMTMTMTMTMTMTMTMTM  ",
+    "   TTTTTTTTTTTTTTTT   ",
+    "    DDDDDDDDDDDDDD    ",
+    "     FFFFFFFFFFFF     ",
+    "      FFWFFFFFFWFF    ",
+    "       FFFFFFFF       ",
+    "         FFFF         ",
+  ];
+
+  const colors = {
+    B: 0xbbbb99, R: 0x994444, C: 0x444433,
+    E: 0x111100, G: 0x33ff33, N: 0x222211,
+    D: 0x777755, T: 0xccbb88, M: 0x111100,
+    F: 0x667744, W: 0x88aa44,
+  };
+  const halfW = (data[0].length * px) / 2;
+
+  for (let r = 0; r < data.length; r++) {
+    for (let c = 0; c < data[r].length; c++) {
+      const ch = data[r][c];
+      if (ch === " ") continue;
+      g.rect(c * px - halfW, top + r * px, px, px);
+      g.fill(colors[ch]);
+    }
+  }
+
+  // Green ooze dripping from eye sockets
+  const eyeY = top + 8 * px;
+  for (const ex of [-halfW + 4 * px, halfW - 6 * px]) {
+    for (let i = 0; i < 4; i++) {
+      const dripX = ex + (Math.random() - 0.5) * px * 2;
+      g.rect(dripX, eyeY + i * px * 2, px, px * 2);
+      g.fill(i < 2 ? 0x33ff33 : 0x228822);
+    }
+  }
+
+  // Crack lines across the skull
+  g.moveTo(-halfW + 6 * px, top + 2 * px);
+  g.lineTo(-halfW + 8 * px, top + 5 * px);
+  g.stroke({ width: 2, color: 0x444433 });
+  g.moveTo(halfW - 6 * px, top + 2 * px);
+  g.lineTo(halfW - 8 * px, top + 5 * px);
+  g.stroke({ width: 2, color: 0x444433 });
+
+  container.addChild(g);
+  return g;
+}
+
 function createBoss(bossConfig) {
   const container = new Container();
   const { type, name, wordCount, wordLen, speed } = bossConfig;
@@ -761,6 +833,7 @@ function createBoss(bossConfig) {
   else if (type === "ghost") drawGhost(container);
   else if (type === "shark") drawShark(container);
   else if (type === "demon") drawDemon(container);
+  else if (type === "skull") drawSkull(container);
 
   // Blood layer
   const bloodContainer = new Container();
@@ -798,10 +871,11 @@ function createBoss(bossConfig) {
     const by = bubbleStartY + row * 24;
 
     if (fullWord[i] === " ") {
-      // Space separator — yellow dot indicator
+      // Space separator — bright yellow dot indicator (turns gray on hit)
       const dot = new Graphics();
-      dot.circle(bx, by, 3);
-      dot.fill(0xf1c40f);
+      dot.circle(bx, by, 4);
+      dot.fill(0xffffff);
+      dot.tint = 0xffdd00;
       container.addChild(dot);
 
       const spaceLbl = new Text({
@@ -810,13 +884,14 @@ function createBoss(bossConfig) {
           fontFamily: "monospace",
           fontSize: 14,
           fontWeight: "bold",
-          fill: 0xf1c40f,
+          fill: 0xffdd00,
         }),
         resolution: 4,
       });
       spaceLbl.anchor.set(0.5);
       spaceLbl.x = bx;
       spaceLbl.y = by;
+      spaceLbl._dot = dot;
       container.addChild(spaceLbl);
       letterTexts.push(spaceLbl);
       bubblePositions.push({ x: bx, y: by });
@@ -1209,7 +1284,10 @@ window.addEventListener("keydown", (e) => {
     if (boss) {
       // Immediately advance past the space (no bullet needed)
       playHit();
-      boss.letterTexts[boss.hitIndex].style.fill = 0x333333;
+      boss.letterTexts[boss.hitIndex].style.fill = 0x555555;
+      if (boss.letterTexts[boss.hitIndex]._dot) {
+        boss.letterTexts[boss.hitIndex]._dot.tint = 0x555555;
+      }
       boss.hitIndex++;
       if (boss.updateHpBar) boss.updateHpBar(boss.hitIndex, boss.word.length);
     }
