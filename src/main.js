@@ -220,6 +220,10 @@ function createMonster(word) {
   const propeller = new Graphics();
   container.addChild(propeller);
 
+  // Blood layer – sits above body but below bubbles so blood never covers letters
+  const bloodContainer = new Container();
+  container.addChild(bloodContainer);
+
   // Letter bubbles on shirt – spaced horizontally
   const bubbleY = 14;
   const spacing = 22;
@@ -252,7 +256,7 @@ function createMonster(word) {
     letterTexts.push(lt);
   }
 
-  return { container, propeller, word, letterTexts, hitIndex: 0, beanieY: bodyTop, propScale: scale };
+  return { container, propeller, bloodContainer, word, letterTexts, hitIndex: 0, beanieY: bodyTop, propScale: scale };
 }
 
 function drawPropeller(propeller, tick, beanieY, scale) {
@@ -269,6 +273,52 @@ function drawPropeller(propeller, tick, beanieY, scale) {
     propeller.moveTo(-dx, by - 4 - dy);
     propeller.lineTo(dx, by - 4 + dy);
     propeller.stroke({ width: 3, color: 0x95a5a6 });
+  }
+}
+
+function addMonsterBlood(m) {
+  const letterCount = m.word.length;
+  const bodyHalfW = 18 + (letterCount - 1) * 10;
+  const bodyH = 38 + (letterCount - 1) * 6;
+  const bodyTop = -16 - (letterCount - 1) * 3;
+  const bubbleY = 14;
+  const bubbleR = 13; // bubble radius + margin
+  const spacing = 22;
+  const totalW = (letterCount - 1) * spacing;
+
+  for (let i = 0; i < 8; i++) {
+    let sx, sy, valid;
+    for (let attempt = 0; attempt < 20; attempt++) {
+      sx = (Math.random() - 0.5) * bodyHalfW * 1.6;
+      sy = bodyTop + 4 + Math.random() * (bodyH - 8);
+      valid = true;
+      for (let j = 0; j < letterCount; j++) {
+        const bx = -totalW / 2 + j * spacing;
+        const dx = sx - bx;
+        const dy = sy - bubbleY;
+        if (dx * dx + dy * dy < bubbleR * bubbleR) {
+          valid = false;
+          break;
+        }
+      }
+      if (valid) break;
+    }
+    if (!valid) continue;
+
+    const g = new Graphics();
+    const r = 2 + Math.random() * 3;
+    g.circle(0, 0, r);
+    g.fill(Math.random() < 0.4 ? 0x8b0000 : 0xcc0000);
+    // Add small drip streaks
+    if (Math.random() < 0.3) {
+      const dripLen = 3 + Math.random() * 6;
+      g.moveTo(0, r);
+      g.lineTo(0, r + dripLen);
+      g.stroke({ width: 1.5, color: 0x8b0000 });
+    }
+    g.x = sx;
+    g.y = sy;
+    m.bloodContainer.addChild(g);
   }
 }
 
@@ -448,6 +498,30 @@ let spawnTimer = 0;
 // ── Bullets ────────────────────────────────────────────────
 let bullets = [];
 
+// ── Blood particles ───────────────────────────────────────
+let bloodParticles = [];
+
+function spawnBlood(x, y, count) {
+  for (let i = 0; i < count; i++) {
+    const g = new Graphics();
+    const r = 1.5 + Math.random() * 2.5;
+    g.circle(0, 0, r);
+    g.fill(Math.random() < 0.4 ? 0x8b0000 : 0xcc0000);
+    g.x = x;
+    g.y = y;
+    app.stage.addChild(g);
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 1 + Math.random() * 5;
+    bloodParticles.push({
+      gfx: g,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - 2,
+      life: 1,
+      decay: 0.015 + Math.random() * 0.02,
+    });
+  }
+}
+
 // ── Stun UI ───────────────────────────────────────────────
 const stunText = new Text({
   text: "STUNNED!",
@@ -558,8 +632,10 @@ window.addEventListener("keydown", (e) => {
 function restartGame() {
   for (const m of monsters) app.stage.removeChild(m.container);
   for (const b of bullets) app.stage.removeChild(b.gfx);
+  for (const p of bloodParticles) app.stage.removeChild(p.gfx);
   monsters = [];
   bullets = [];
+  bloodParticles = [];
   score = 0;
   lives = 3;
   level = 1;
@@ -674,10 +750,12 @@ app.ticker.add((ticker) => {
       t.letterTexts[t.hitIndex].style.fill = 0xaaaaaa;
       t.hitIndex++;
       playHit();
+      spawnBlood(t.container.x, t.container.y, 8);
 
       if (t.hitIndex >= t.word.length) {
         // All letters hit — kill it
         playKill();
+        spawnBlood(t.container.x, t.container.y, 25);
         score++;
         scoreText.text = `Score: ${score}`;
         const newLevel = Math.min(Math.floor(score / 10) + 1, MAX_LEVEL + 1);
@@ -694,6 +772,9 @@ app.ticker.add((ticker) => {
           gameWon = true;
           winText.visible = true;
         }
+      } else {
+        // Non-kill hit — add persistent blood on monster body
+        addMonsterBlood(t);
       }
 
       app.stage.removeChild(b.gfx);
@@ -710,6 +791,20 @@ app.ticker.add((ticker) => {
     ) {
       app.stage.removeChild(b.gfx);
       bullets.splice(i, 1);
+    }
+  }
+
+  // Update blood particles
+  for (let i = bloodParticles.length - 1; i >= 0; i--) {
+    const p = bloodParticles[i];
+    p.vy += 0.15 * dt; // gravity
+    p.gfx.x += p.vx * dt;
+    p.gfx.y += p.vy * dt;
+    p.life -= p.decay * dt;
+    p.gfx.alpha = p.life;
+    if (p.life <= 0) {
+      app.stage.removeChild(p.gfx);
+      bloodParticles.splice(i, 1);
     }
   }
 });
