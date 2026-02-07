@@ -677,6 +677,81 @@ function drawShark(container) {
   return g;
 }
 
+function drawDemon(container) {
+  const g = new Graphics();
+  const px = 4;
+  const top = -90;
+
+  // 18-wide × 26-tall pixel grid
+  const data = [
+    "H             H   ",
+    "HH    RRR   HH    ",
+    " HH RRRRRRRHH     ",
+    "  HHRRRRRRRRHH    ",
+    "   RRRRRRRRRR     ",
+    "   RRRRRRRRRR     ",
+    "   RRERRRRRERR    ",
+    "   RRPRRRRRRPRR   ",
+    "   RRERRRRRERR    ",
+    "   RRRRRRRRRR     ",
+    "   RRRRMMMRRRR    ",
+    "   RRRMMMMMRRR    ",
+    "   RRRRMMMRRRR    ",
+    "  WRRRRRRRRRRRW   ",
+    " WWRRRRRRRRRRRWW  ",
+    " W RRRRRRRRRRRR W ",
+    "W  RRRRRRRRRRRR  W",
+    "   DDDDDDDDDDDD   ",
+    "   DDDDDDDDDDDD   ",
+    "   DDDDDDDDDDDD   ",
+    "    DDDDDDDDDDD   ",
+    "    DDDD   DDDD   ",
+    "    DDD     DDD   ",
+    "   FDD       DDF  ",
+    "   FF         FF  ",
+    "  FF           FF ",
+  ];
+
+  const colors = {
+    R: 0xcc2222, D: 0x881111, H: 0x550000,
+    E: 0x111111, P: 0xffaa00, M: 0x111111,
+    W: 0x771111, F: 0x993300,
+  };
+  const halfW = (data[0].length * px) / 2;
+
+  for (let r = 0; r < data.length; r++) {
+    for (let c = 0; c < data[r].length; c++) {
+      const ch = data[r][c];
+      if (ch === " ") continue;
+      g.rect(c * px - halfW, top + r * px, px, px);
+      g.fill(colors[ch]);
+    }
+  }
+
+  // Fire aura — flickering flame particles around the body
+  const flames = [
+    { x: -30, y: -60, h: 18 }, { x: 30, y: -60, h: 18 },
+    { x: -38, y: -30, h: 14 }, { x: 38, y: -30, h: 14 },
+    { x: -34, y: 0, h: 12 }, { x: 34, y: 0, h: 12 },
+    { x: -20, y: -80, h: 10 }, { x: 20, y: -80, h: 10 },
+  ];
+  for (const f of flames) {
+    g.moveTo(f.x - 4, f.y);
+    g.lineTo(f.x + 4, f.y);
+    g.lineTo(f.x, f.y - f.h);
+    g.closePath();
+    g.fill(0xff6600);
+    g.moveTo(f.x - 2, f.y);
+    g.lineTo(f.x + 2, f.y);
+    g.lineTo(f.x, f.y - f.h * 0.6);
+    g.closePath();
+    g.fill(0xffcc00);
+  }
+
+  container.addChild(g);
+  return g;
+}
+
 function createBoss(bossConfig) {
   const container = new Container();
   const { type, name, wordCount, wordLen, speed } = bossConfig;
@@ -685,6 +760,7 @@ function createBoss(bossConfig) {
   if (type === "skeleton") drawSkeleton(container);
   else if (type === "ghost") drawGhost(container);
   else if (type === "shark") drawShark(container);
+  else if (type === "demon") drawDemon(container);
 
   // Blood layer
   const bloodContainer = new Container();
@@ -722,10 +798,10 @@ function createBoss(bossConfig) {
     const by = bubbleStartY + row * 24;
 
     if (fullWord[i] === " ") {
-      // Space separator — draw a small dot indicator
+      // Space separator — yellow dot indicator
       const dot = new Graphics();
       dot.circle(bx, by, 3);
-      dot.fill(0x666666);
+      dot.fill(0xf1c40f);
       container.addChild(dot);
 
       const spaceLbl = new Text({
@@ -734,7 +810,7 @@ function createBoss(bossConfig) {
           fontFamily: "monospace",
           fontSize: 14,
           fontWeight: "bold",
-          fill: 0x888888,
+          fill: 0xf1c40f,
         }),
         resolution: 4,
       });
@@ -1133,7 +1209,7 @@ window.addEventListener("keydown", (e) => {
     if (boss) {
       // Immediately advance past the space (no bullet needed)
       playHit();
-      boss.letterTexts[boss.hitIndex].style.fill = 0x555555;
+      boss.letterTexts[boss.hitIndex].style.fill = 0x333333;
       boss.hitIndex++;
       if (boss.updateHpBar) boss.updateHpBar(boss.hitIndex, boss.word.length);
     }
