@@ -33,18 +33,80 @@ function getSpawnInterval() {
 }
 
 function getAvgLettersPerMonster() {
-  const maxLetters = Math.floor((level - 1) / 10) + 1;
-  if (maxLetters === 1) return 1;
+  // Tier 0 (levels 1-10): always 1 letter
+  // Tier T≥1: base length T, chance of T+1 scales 10%→100% within the tier
+  // This guarantees monotonic increase across tier boundaries
+  const tier = Math.floor((level - 1) / 10);
+  if (tier === 0) return 1;
   const tierProgress = ((level - 1) % 10) / 9;
-  const multiChance = 0.1 + tierProgress * 0.9;
-  // Expected value: multiChance * maxLetters + (1-multiChance) * avg(1..maxLetters-1)
-  const avgShorter = maxLetters / 2; // avg of 1..maxLetters-1
-  return multiChance * maxLetters + (1 - multiChance) * avgShorter;
+  const upgradeChance = 0.1 + tierProgress * 0.9;
+  return tier + upgradeChance;
+}
+
+function getAvgSpeed() {
+  const speedLevel = Math.min(level, 10);
+  const minSpeed = MONSTER_SPEED + (speedLevel - 1) * 0.06;
+  const maxSpeed = MONSTER_SPEED + (speedLevel - 1) * 0.5;
+  return (minSpeed + maxSpeed) / 2;
 }
 
 function getLPS() {
   const monstersPerSec = 1000 / getSpawnInterval();
-  return (getAvgLettersPerMonster() * monstersPerSec).toFixed(1);
+  const speedFactor = getAvgSpeed() / MONSTER_SPEED;
+  return (getAvgLettersPerMonster() * monstersPerSec * speedFactor).toFixed(1);
+}
+
+// ── Sound effects (Web Audio API) ──────────────────────────
+let soundEnabled = true;
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+function playShoot() {
+  if (!soundEnabled) return;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.type = "square";
+  osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(1760, audioCtx.currentTime + 0.05);
+  gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.08);
+  osc.start(audioCtx.currentTime);
+  osc.stop(audioCtx.currentTime + 0.08);
+}
+
+function playHit() {
+  if (!soundEnabled) return;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(300, audioCtx.currentTime + 0.06);
+  gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.06);
+  osc.start(audioCtx.currentTime);
+  osc.stop(audioCtx.currentTime + 0.06);
+}
+
+function playKill() {
+  if (!soundEnabled) return;
+  const t = audioCtx.currentTime;
+  // Two-tone descending burst
+  for (let i = 0; i < 2; i++) {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.type = i === 0 ? "square" : "sawtooth";
+    osc.frequency.setValueAtTime(500 - i * 100, t);
+    osc.frequency.exponentialRampToValueAtTime(80, t + 0.2);
+    gain.gain.setValueAtTime(0.12, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+    osc.start(t);
+    osc.stop(t + 0.2);
+  }
 }
 
 // ── Draw helpers ───────────────────────────────────────────
@@ -262,6 +324,12 @@ lpsText.x = 14;
 lpsText.y = 98;
 app.stage.addChild(lpsText);
 
+const soundText = new Text({ text: "Sound: ON", style: uiStyle });
+soundText.anchor.set(1, 0);
+soundText.x = app.screen.width - 14;
+soundText.y = 14;
+app.stage.addChild(soundText);
+
 const gameOverText = new Text({
   text: "GAME OVER\nPress Space to restart",
   style: new TextStyle({
@@ -309,18 +377,13 @@ app.stage.addChild(pauseText);
 
 // ── Spawning ───────────────────────────────────────────────
 function getWordLength() {
-  // Level 1-10: always 1 letter
-  // Level 11-20: chance of 2-letter, increasing with level
-  // Level 21-30: chance of 3-letter, etc.
-  const maxLetters = Math.floor((level - 1) / 10) + 1;
-  if (maxLetters === 1) return 1;
-
-  // Within a tier (e.g. 11-20), chance of the longer word scales from 10% to 100%
-  const tierProgress = ((level - 1) % 10) / 9; // 0..1
-  const multiChance = 0.1 + tierProgress * 0.9;
-  if (Math.random() < multiChance) return maxLetters;
-  // Otherwise roll for any length from 1 to maxLetters-1
-  return Math.ceil(Math.random() * (maxLetters - 1));
+  // Tier 0 (levels 1-10): always 1 letter
+  // Tier T≥1: base length T, chance of T+1 scales 10%→100%
+  const tier = Math.floor((level - 1) / 10);
+  if (tier === 0) return 1;
+  const tierProgress = ((level - 1) % 10) / 9;
+  const upgradeChance = 0.1 + tierProgress * 0.9;
+  return Math.random() < upgradeChance ? tier + 1 : tier;
 }
 
 function pickWord(wordLen) {
@@ -401,6 +464,12 @@ window.addEventListener("keydown", (e) => {
     return;
   }
 
+  if (e.code === "Backquote") {
+    soundEnabled = !soundEnabled;
+    soundText.text = soundEnabled ? "Sound: ON" : "Sound: OFF";
+    return;
+  }
+
   if (e.code === "Escape") {
     const wasPaused = paused;
     paused = true;
@@ -456,12 +525,18 @@ window.addEventListener("keydown", (e) => {
     .sort((a, b) => a.container.x - b.container.x)[0];
 
   if (!target) {
-    // Typed a wrong letter — stunned for 300ms
-    stunUntil = Date.now() + 300;
+    // Don't stun if the letter was already cleared on some active monster
+    const isGrayedLetter = monsters.some(
+      (m) => !m.dying && m.hitIndex > 0 && m.word.slice(0, m.hitIndex).includes(key)
+    );
+    if (!isGrayedLetter) {
+      stunUntil = Date.now() + 300;
+    }
     return;
   }
 
   // Shoot!
+  playShoot();
   const bullet = createBullet(
     player.x + 20,
     player.y - 5,
@@ -591,9 +666,11 @@ app.ticker.add((ticker) => {
       // Grey out the hit letter
       t.letterTexts[t.hitIndex].style.fill = 0xaaaaaa;
       t.hitIndex++;
+      playHit();
 
       if (t.hitIndex >= t.word.length) {
         // All letters hit — kill it
+        playKill();
         score++;
         scoreText.text = `Score: ${score}`;
         const newLevel = Math.min(Math.floor(score / 10) + 1, MAX_LEVEL + 1);
