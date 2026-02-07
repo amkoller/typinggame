@@ -1059,6 +1059,7 @@ function createBoss(bossConfig) {
       lt.anchor.set(0.5);
       lt.x = bx;
       lt.y = by;
+      lt._bubble = bubble;
       container.addChild(lt);
       letterTexts.push(lt);
       bubblePositions.push({ x: bx, y: by });
@@ -1426,10 +1427,16 @@ window.addEventListener("keydown", (e) => {
 
     if (boss) {
       // Immediately advance past the space (no bullet needed)
+      // Note: hitIndex may point to a letter if bullets are still in-flight,
+      // so apply visuals based on actual character type at hitIndex
       playHit();
-      boss.letterTexts[boss.hitIndex].style.fill = 0x555555;
-      if (boss.letterTexts[boss.hitIndex]._dot) {
-        boss.letterTexts[boss.hitIndex]._dot.tint = 0x555555;
+      const idx = boss.hitIndex;
+      if (boss.word[idx] === " ") {
+        boss.letterTexts[idx].style.fill = 0x555555;
+        if (boss.letterTexts[idx]._dot) boss.letterTexts[idx]._dot.visible = false;
+      } else {
+        boss.letterTexts[idx].style.fill = 0xaaaaaa;
+        if (boss.letterTexts[idx]._bubble) boss.letterTexts[idx]._bubble.tint = 0x888888;
       }
       boss.hitIndex++;
       if (boss.updateHpBar) boss.updateHpBar(boss.hitIndex, boss.word.length);
@@ -1612,8 +1619,14 @@ app.ticker.add((ticker) => {
         continue;
       }
 
-      // Grey out the hit letter
-      t.letterTexts[t.hitIndex].style.fill = 0xaaaaaa;
+      // Grey out the hit character — detect letter vs space for correct visuals
+      if (t.word[t.hitIndex] === " ") {
+        t.letterTexts[t.hitIndex].style.fill = 0x555555;
+        if (t.letterTexts[t.hitIndex]._dot) t.letterTexts[t.hitIndex]._dot.visible = false;
+      } else {
+        t.letterTexts[t.hitIndex].style.fill = 0xaaaaaa;
+        if (t.letterTexts[t.hitIndex]._bubble) t.letterTexts[t.hitIndex]._bubble.tint = 0x888888;
+      }
       t.hitIndex++;
       playHit();
       spawnBlood(t.container.x, t.container.y, 8);
