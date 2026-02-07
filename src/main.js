@@ -113,6 +113,112 @@ function playKill() {
   }
 }
 
+// ── Music (8-bit chiptune) ────────────────────────────────
+let musicPlaying = false;
+let musicStep = 0;
+let nextNoteTime = 0;
+let musicTimerId = null;
+
+// C-minor melody (32 eighth-note steps)
+// C5=523, D5=587, Eb5=622, F5=698, G5=784, Bb4=466, Ab4=415
+const melodyNotes = [
+  523, 0, 622, 0, 784, 0, 622, 698,
+  784, 0, 622, 0, 523, 0, 466, 0,
+  415, 0, 523, 0, 622, 0, 698, 622,
+  587, 0, 523, 0, 466, 0, 523, 0,
+];
+
+// Bass line (32 steps)
+// C3=131, G2=98, Ab2=104, Eb3=156, F3=175
+const bassNotes = [
+  131, 0, 131, 0, 98, 0, 98, 0,
+  104, 0, 104, 0, 156, 0, 156, 0,
+  175, 0, 175, 0, 131, 0, 131, 0,
+  98, 0, 98, 0, 131, 0, 131, 0,
+];
+
+// Drums: 1=kick, 2=hi-hat
+const drumHits = [
+  1, 0, 2, 0, 1, 0, 2, 0,
+  1, 0, 2, 0, 1, 0, 2, 2,
+  1, 0, 2, 0, 1, 0, 2, 0,
+  1, 0, 2, 2, 1, 2, 1, 2,
+];
+
+function getMusicTempo() {
+  // Eighth-note duration: BPM 140 at level 1 → BPM 220 at level 60
+  const bpm = 140 + (Math.min(level, 60) - 1) * (80 / 59);
+  return 60 / bpm / 2;
+}
+
+function playMusicNote(freq, time, duration, type, vol) {
+  if (!freq) return;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, time);
+  gain.gain.setValueAtTime(vol, time);
+  gain.gain.exponentialRampToValueAtTime(0.001, time + duration * 0.9);
+  osc.start(time);
+  osc.stop(time + duration);
+}
+
+function playDrumHit(type, time) {
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  if (type === 1) {
+    // Kick
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(150, time);
+    osc.frequency.exponentialRampToValueAtTime(40, time + 0.08);
+    gain.gain.setValueAtTime(0.07, time);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.08);
+    osc.start(time);
+    osc.stop(time + 0.08);
+  } else {
+    // Hi-hat
+    osc.type = "square";
+    osc.frequency.setValueAtTime(800 + Math.random() * 600, time);
+    gain.gain.setValueAtTime(0.02, time);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.03);
+    osc.start(time);
+    osc.stop(time + 0.03);
+  }
+}
+
+function scheduleMusicNotes() {
+  if (nextNoteTime < audioCtx.currentTime) {
+    nextNoteTime = audioCtx.currentTime;
+  }
+  while (nextNoteTime < audioCtx.currentTime + 0.1) {
+    const dur = getMusicTempo();
+    const idx = musicStep % melodyNotes.length;
+    playMusicNote(melodyNotes[idx], nextNoteTime, dur * 0.8, "square", 0.05);
+    playMusicNote(bassNotes[idx], nextNoteTime, dur * 0.9, "triangle", 0.045);
+    if (drumHits[idx]) playDrumHit(drumHits[idx], nextNoteTime);
+    nextNoteTime += dur;
+    musicStep++;
+  }
+}
+
+function startMusic() {
+  if (musicPlaying || !soundEnabled) return;
+  musicPlaying = true;
+  nextNoteTime = audioCtx.currentTime;
+  musicTimerId = setInterval(scheduleMusicNotes, 50);
+}
+
+function stopMusic() {
+  if (!musicPlaying) return;
+  musicPlaying = false;
+  clearInterval(musicTimerId);
+  musicTimerId = null;
+}
+
 // ── Draw helpers ───────────────────────────────────────────
 
 function drawOctopus(container) {
@@ -540,6 +646,14 @@ app.stage.addChild(stunText);
 
 // ── Input ──────────────────────────────────────────────────
 window.addEventListener("keydown", (e) => {
+  // Resume audio context on first user interaction
+  if (audioCtx.state === "suspended") audioCtx.resume();
+
+  // Auto-start music if conditions are right
+  if (soundEnabled && !musicPlaying && !gameOver && !gameWon && !paused) {
+    startMusic();
+  }
+
   if (gameOver || gameWon) {
     if (e.code === "Space") restartGame();
     return;
@@ -548,6 +662,8 @@ window.addEventListener("keydown", (e) => {
   if (e.code === "Backquote") {
     soundEnabled = !soundEnabled;
     soundText.text = soundEnabled ? "Sound: ON" : "Sound: OFF";
+    if (soundEnabled && !paused && !gameOver && !gameWon) startMusic();
+    else stopMusic();
     return;
   }
 
@@ -555,6 +671,7 @@ window.addEventListener("keydown", (e) => {
     const wasPaused = paused;
     paused = true;
     pauseText.visible = true;
+    stopMusic();
     const input = prompt("Enter a starting level (1-60):");
     if (input !== null) {
       const n = parseInt(input, 10);
@@ -571,12 +688,15 @@ window.addEventListener("keydown", (e) => {
     // Restore previous pause state if cancelled or invalid
     paused = wasPaused;
     pauseText.visible = wasPaused;
+    if (!wasPaused && soundEnabled) startMusic();
     return;
   }
 
   if (e.code === "Space") {
     paused = !paused;
     pauseText.visible = paused;
+    if (paused) stopMusic();
+    else if (soundEnabled) startMusic();
     return;
   }
 
@@ -651,6 +771,8 @@ function restartGame() {
   gameOverText.visible = false;
   winText.visible = false;
   spawnTimer = 0;
+  stopMusic();
+  if (soundEnabled) startMusic();
 }
 
 // ── Game loop ──────────────────────────────────────────────
@@ -715,6 +837,7 @@ app.ticker.add((ticker) => {
         if (lives <= 0) {
           gameOver = true;
           gameOverText.visible = true;
+          stopMusic();
         }
       }
     }
@@ -771,6 +894,7 @@ app.ticker.add((ticker) => {
         if (level > MAX_LEVEL) {
           gameWon = true;
           winText.visible = true;
+          stopMusic();
         }
       } else {
         // Non-kill hit — add persistent blood on monster body
