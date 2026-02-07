@@ -20,6 +20,13 @@ const MONSTER_SPEED = 1.2;
 const SPAWN_INTERVAL = 2000; // ms
 const PLAYER_X = 100;
 const MAX_LEVEL = 60;
+const BOSS_LEVELS = {
+  10: { type: "skeleton", name: "SKELETON", wordCount: 7, wordLen: 3, speed: 0.3 },
+  20: { type: "ghost", name: "GHOST", wordCount: 8, wordLen: 4, speed: 0.25 },
+  30: { type: "shark", name: "LASER SHARK", wordCount: 12, wordLen: 4, speed: 0.2 },
+  40: { type: "demon", name: "FIRE DEMON", wordCount: 15, wordLen: 5, speed: 0.15 },
+  50: { type: "skull", name: "ZOMBIE SKULL", wordCount: 20, wordLen: 5, speed: 0.1 },
+};
 
 let monsters = [];
 let score = 0;
@@ -29,6 +36,7 @@ let gameOver = false;
 let gameWon = false;
 let paused = false;
 let stunUntil = 0; // timestamp when stun ends (miss penalty)
+let bossActive = false;
 
 function getSpawnInterval() {
   // 2000ms at level 1, decreasing by 25ms per level, min 550ms
@@ -428,6 +436,266 @@ function addMonsterBlood(m) {
   }
 }
 
+// ── Boss drawing ──────────────────────────────────────────
+
+function drawSkeleton(container) {
+  const g = new Graphics();
+  const px = 3; // pixel size for retro look
+
+  // Skull (12x10 pixel grid, centered at 0, top at -90)
+  const skullTop = -90;
+  const skullData = [
+    "  XXXXXXXX  ",
+    " XXXXXXXXXX ",
+    "XXXXXXXXXXXX",
+    "XXX..XX..XXX",
+    "XXX..XX..XXX",
+    "XXXXXXXXXXXX",
+    " XXXX..XXXX ",
+    " X.X.XX.X.X ",
+    "  X..XX..X  ",
+    "   XXXXXX   ",
+  ];
+  for (let r = 0; r < skullData.length; r++) {
+    for (let c = 0; c < skullData[r].length; c++) {
+      const ch = skullData[r][c];
+      if (ch === " ") continue;
+      const color = ch === "X" ? 0xdddddd : 0x222222;
+      g.rect(c * px - 18, skullTop + r * px, px, px);
+      g.fill(color);
+    }
+  }
+
+  // Spine (centered, below skull)
+  const spineTop = skullTop + 30;
+  for (let i = 0; i < 8; i++) {
+    g.rect(-px, spineTop + i * px * 2, px * 2, px);
+    g.fill(0xcccccc);
+  }
+
+  // Ribcage (3 pairs of ribs)
+  const ribTop = spineTop + 4;
+  for (let i = 0; i < 3; i++) {
+    const ry = ribTop + i * px * 4;
+    // Left ribs
+    g.rect(-px * 5, ry, px * 4, px);
+    g.fill(0xbbbbbb);
+    g.rect(-px * 6, ry + px, px, px * 2);
+    g.fill(0xbbbbbb);
+    // Right ribs
+    g.rect(px, ry, px * 4, px);
+    g.fill(0xbbbbbb);
+    g.rect(px * 5, ry + px, px, px * 2);
+    g.fill(0xbbbbbb);
+  }
+
+  // Pelvis
+  const pelvisY = spineTop + px * 16;
+  g.rect(-px * 3, pelvisY, px * 6, px * 2);
+  g.fill(0xcccccc);
+  g.rect(-px * 4, pelvisY + px * 2, px * 2, px);
+  g.fill(0xcccccc);
+  g.rect(px * 2, pelvisY + px * 2, px * 2, px);
+  g.fill(0xcccccc);
+
+  // Arms (stick out from ribs, angled down)
+  // Left arm
+  for (let i = 0; i < 6; i++) {
+    g.rect(-px * 6 - i * px, ribTop + i * px * 2, px, px * 2);
+    g.fill(0xaaaaaa);
+  }
+  // Left hand (3 finger bones)
+  const lhx = -px * 12, lhy = ribTop + px * 12;
+  g.rect(lhx - px, lhy, px, px * 3);
+  g.fill(0xbbbbbb);
+  g.rect(lhx, lhy - px, px, px * 3);
+  g.fill(0xbbbbbb);
+  g.rect(lhx + px, lhy, px, px * 3);
+  g.fill(0xbbbbbb);
+
+  // Right arm
+  for (let i = 0; i < 6; i++) {
+    g.rect(px * 5 + i * px, ribTop + i * px * 2, px, px * 2);
+    g.fill(0xaaaaaa);
+  }
+  // Right hand
+  const rhx = px * 11, rhy = ribTop + px * 12;
+  g.rect(rhx - px, rhy, px, px * 3);
+  g.fill(0xbbbbbb);
+  g.rect(rhx, rhy - px, px, px * 3);
+  g.fill(0xbbbbbb);
+  g.rect(rhx + px, rhy, px, px * 3);
+  g.fill(0xbbbbbb);
+
+  // Legs
+  const legTop = pelvisY + px * 3;
+  for (let i = 0; i < 7; i++) {
+    // Left leg
+    g.rect(-px * 3, legTop + i * px * 2, px * 2, px * 2);
+    g.fill(0xaaaaaa);
+    // Right leg
+    g.rect(px, legTop + i * px * 2, px * 2, px * 2);
+    g.fill(0xaaaaaa);
+  }
+  // Feet
+  const footY = legTop + px * 14;
+  g.rect(-px * 5, footY, px * 4, px);
+  g.fill(0xbbbbbb);
+  g.rect(-px, footY, px * 4, px);
+  g.fill(0xbbbbbb);
+
+  // Red glowing eyes
+  g.circle(-6, skullTop + 12, 3);
+  g.circle(6, skullTop + 12, 3);
+  g.fill(0xff2222);
+
+  container.addChild(g);
+  return g;
+}
+
+function createBoss(bossConfig) {
+  const container = new Container();
+  const { type, name, wordCount, wordLen, speed } = bossConfig;
+
+  // Draw the boss body
+  if (type === "skeleton") drawSkeleton(container);
+
+  // Blood layer
+  const bloodContainer = new Container();
+  container.addChild(bloodContainer);
+
+  // Generate words for the boss
+  const words = [];
+  for (let i = 0; i < wordCount; i++) {
+    const pool = substrings[String(wordLen)];
+    if (pool && pool.length > 0) {
+      words.push(pool[Math.floor(Math.random() * pool.length)]);
+    }
+  }
+
+  // Build the full string: "CAT DOG BAT FLY ..." (spaces between words)
+  const fullWord = words.join(" ");
+
+  // Layout letter bubbles in rows below the boss body
+  const bubbleSpacing = 20;
+  const maxPerRow = 14;
+  const bubbleStartY = 55;
+  const letterTexts = [];
+  const bubblePositions = []; // for blood avoidance
+
+  for (let i = 0; i < fullWord.length; i++) {
+    // Determine row and column
+    const row = Math.floor(i / maxPerRow);
+    const rowStart = row * maxPerRow;
+    const rowEnd = Math.min(rowStart + maxPerRow, fullWord.length);
+    const rowLen = rowEnd - rowStart;
+    const col = i - rowStart;
+
+    const totalRowW = (rowLen - 1) * bubbleSpacing;
+    const bx = -totalRowW / 2 + col * bubbleSpacing;
+    const by = bubbleStartY + row * 24;
+
+    if (fullWord[i] === " ") {
+      // Space separator — draw a small dot indicator
+      const dot = new Graphics();
+      dot.circle(bx, by, 3);
+      dot.fill(0x666666);
+      container.addChild(dot);
+
+      const spaceLbl = new Text({
+        text: "·",
+        style: new TextStyle({
+          fontFamily: "monospace",
+          fontSize: 14,
+          fontWeight: "bold",
+          fill: 0x888888,
+        }),
+        resolution: 4,
+      });
+      spaceLbl.anchor.set(0.5);
+      spaceLbl.x = bx;
+      spaceLbl.y = by;
+      container.addChild(spaceLbl);
+      letterTexts.push(spaceLbl);
+      bubblePositions.push({ x: bx, y: by });
+    } else {
+      const bubble = new Graphics();
+      bubble.circle(bx, by, 10);
+      bubble.fill(0xffffff);
+      bubble.circle(bx, by, 10);
+      bubble.stroke({ width: 1.5, color: 0xbdc3c7 });
+      container.addChild(bubble);
+
+      const lt = new Text({
+        text: fullWord[i],
+        style: new TextStyle({
+          fontFamily: "Arial",
+          fontSize: 13,
+          fontWeight: "bold",
+          fill: 0x2c3e50,
+        }),
+        resolution: 4,
+      });
+      lt.anchor.set(0.5);
+      lt.x = bx;
+      lt.y = by;
+      container.addChild(lt);
+      letterTexts.push(lt);
+      bubblePositions.push({ x: bx, y: by });
+    }
+  }
+
+  // Boss name label above
+  const nameLabel = new Text({
+    text: name,
+    style: new TextStyle({
+      fontFamily: "monospace",
+      fontSize: 16,
+      fontWeight: "bold",
+      fill: 0xff4444,
+    }),
+    resolution: 4,
+  });
+  nameLabel.anchor.set(0.5);
+  nameLabel.y = -110;
+  container.addChild(nameLabel);
+
+  // Health bar background (just below name, above skeleton)
+  const hpBarY = -100;
+  const hpBarBg = new Graphics();
+  hpBarBg.roundRect(-60, hpBarY, 120, 8, 3);
+  hpBarBg.fill(0x333333);
+  container.addChild(hpBarBg);
+
+  // Health bar fill
+  const hpBar = new Graphics();
+  hpBarBg.addChild(hpBar);
+
+  function updateHpBar(hitIndex, total) {
+    hpBar.clear();
+    const pct = 1 - hitIndex / total;
+    if (pct > 0) {
+      hpBar.roundRect(-60, hpBarY, 120 * pct, 8, 3);
+      hpBar.fill(pct > 0.5 ? 0x2ecc71 : pct > 0.25 ? 0xf39c12 : 0xe74c3c);
+    }
+  }
+  updateHpBar(0, fullWord.length);
+
+  return {
+    container,
+    propeller: null, // bosses don't have propellers
+    bloodContainer,
+    word: fullWord,
+    letterTexts,
+    hitIndex: 0,
+    isBoss: true,
+    bossConfig,
+    bubblePositions,
+    updateHpBar,
+    speed,
+  };
+}
+
 // ── Projectile (laser bolt) ───────────────────────────────
 function createBullet(x, y, targetX, targetY) {
   const bullet = new Graphics();
@@ -492,7 +760,7 @@ soundText.y = 14;
 app.stage.addChild(soundText);
 
 const gameOverText = new Text({
-  text: "GAME OVER\nPress Space to restart",
+  text: "GAME OVER\nPress Enter to restart",
   style: new TextStyle({
     fontFamily: "monospace",
     fontSize: 42,
@@ -507,7 +775,7 @@ gameOverText.visible = false;
 app.stage.addChild(gameOverText);
 
 const winText = new Text({
-  text: "YOU WIN!\nPress Space to restart",
+  text: "YOU WIN!\nPress Enter to restart",
   style: new TextStyle({
     fontFamily: "monospace",
     fontSize: 42,
@@ -522,7 +790,7 @@ winText.visible = false;
 app.stage.addChild(winText);
 
 const pauseText = new Text({
-  text: "PAUSED\nPress Space to resume",
+  text: "PAUSED\nPress Enter to resume",
   style: new TextStyle({
     fontFamily: "monospace",
     fontSize: 42,
@@ -575,8 +843,29 @@ function pickWord(wordLen) {
   return null;
 }
 
+function spawnBoss() {
+  const config = BOSS_LEVELS[level];
+  if (!config || bossActive) return;
+
+  const m = createBoss(config);
+  m.container.x = app.screen.width + 80;
+  m.container.y = app.screen.height / 2;
+  m.dying = false;
+  m.dyingVy = 0;
+
+  bossActive = true;
+  app.stage.addChild(m.container);
+  monsters.push(m);
+}
+
 function spawnMonster() {
   if (gameOver || gameWon) return;
+
+  // Boss level: spawn boss instead of regular monsters
+  if (BOSS_LEVELS[level]) {
+    if (!bossActive) spawnBoss();
+    return;
+  }
 
   const wordLen = getWordLength();
   const word = pickWord(wordLen);
@@ -655,7 +944,7 @@ window.addEventListener("keydown", (e) => {
   }
 
   if (gameOver || gameWon) {
-    if (e.code === "Space") restartGame();
+    if (e.code === "Enter") restartGame();
     return;
   }
 
@@ -692,7 +981,7 @@ window.addEventListener("keydown", (e) => {
     return;
   }
 
-  if (e.code === "Space") {
+  if (e.code === "Enter") {
     paused = !paused;
     pauseText.visible = paused;
     if (paused) stopMusic();
@@ -701,6 +990,30 @@ window.addEventListener("keydown", (e) => {
   }
 
   if (paused) return;
+
+  // Space bar handling for boss word gaps
+  if (e.code === "Space") {
+    e.preventDefault();
+    if (Date.now() < stunUntil) return;
+
+    // Find a boss monster whose next character is a space
+    const boss = monsters.find((m) => {
+      if (m.dying || !m.isBoss) return false;
+      const pending = bullets.filter((b) => b.target === m).length;
+      const nextIdx = m.hitIndex + pending;
+      return nextIdx < m.word.length && m.word[nextIdx] === " ";
+    });
+
+    if (boss) {
+      // Immediately advance past the space (no bullet needed)
+      playHit();
+      boss.letterTexts[boss.hitIndex].style.fill = 0x555555;
+      boss.hitIndex++;
+      if (boss.updateHpBar) boss.updateHpBar(boss.hitIndex, boss.word.length);
+    }
+    // No stun on space misses
+    return;
+  }
 
   const key = e.key.toUpperCase();
   if (key.length !== 1 || !LETTERS.includes(key)) return;
@@ -763,6 +1076,7 @@ function restartGame() {
   gameWon = false;
   paused = false;
   stunUntil = 0;
+  bossActive = false;
   scoreText.text = "Score: 0";
   pauseText.visible = false;
   livesText.text = "Lives: 3";
@@ -808,7 +1122,7 @@ app.ticker.add((ticker) => {
   for (let i = monsters.length - 1; i >= 0; i--) {
     const m = monsters[i];
 
-    drawPropeller(m.propeller, tick, m.beanieY, m.propScale);
+    if (m.propeller) drawPropeller(m.propeller, tick, m.beanieY, m.propScale);
 
     if (m.dying) {
       // Fall down
@@ -829,7 +1143,13 @@ app.ticker.add((ticker) => {
 
       // Reached player side?
       if (m.container.x < PLAYER_X - 30) {
-        lives--;
+        if (m.isBoss) {
+          // Boss reaching player = instant game over
+          lives = 0;
+          bossActive = false;
+        } else {
+          lives--;
+        }
         livesText.text = `Lives: ${lives}`;
         app.stage.removeChild(m.container);
         monsters.splice(i, 1);
@@ -875,12 +1195,23 @@ app.ticker.add((ticker) => {
       playHit();
       spawnBlood(t.container.x, t.container.y, 8);
 
+      // Update boss HP bar
+      if (t.updateHpBar) t.updateHpBar(t.hitIndex, t.word.length);
+
+      // Skip spaces that immediately follow a letter hit (auto-advance)
+      // (spaces are handled by Space key, but if hitIndex lands on space after bullet, don't block)
+
       if (t.hitIndex >= t.word.length) {
         // All letters hit — kill it
         playKill();
-        spawnBlood(t.container.x, t.container.y, 25);
-        score++;
+        spawnBlood(t.container.x, t.container.y, t.isBoss ? 60 : 25);
+
+        const killPoints = t.isBoss ? 10 : 1;
+        score += killPoints;
         scoreText.text = `Score: ${score}`;
+
+        if (t.isBoss) bossActive = false;
+
         const newLevel = Math.min(Math.floor(score / 10) + 1, MAX_LEVEL + 1);
         if (newLevel !== level) {
           level = newLevel;
@@ -898,7 +1229,7 @@ app.ticker.add((ticker) => {
         }
       } else {
         // Non-kill hit — add persistent blood on monster body
-        addMonsterBlood(t);
+        if (!t.isBoss) addMonsterBlood(t);
       }
 
       app.stage.removeChild(b.gfx);
