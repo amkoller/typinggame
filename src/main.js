@@ -1,4 +1,5 @@
 import { Application, Graphics, Text, TextStyle, Container } from "pixi.js";
+import substrings from "./words.json";
 
 const app = new Application();
 
@@ -15,18 +16,35 @@ const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const MONSTER_SPEED = 1.2;
 const SPAWN_INTERVAL = 2000; // ms
 const PLAYER_X = 100;
+const MAX_LEVEL = 60;
 
 let monsters = [];
 let score = 0;
 let lives = 3;
 let level = 1;
 let gameOver = false;
+let gameWon = false;
 let paused = false;
 let stunUntil = 0; // timestamp when stun ends (miss penalty)
 
 function getSpawnInterval() {
-  // 2000ms at level 1, decreasing by 75ms per level, min 800ms
-  return Math.max(800, SPAWN_INTERVAL - (level - 1) * 75);
+  // 2000ms at level 1, decreasing by 30ms per level, min 1000ms
+  return Math.max(1000, SPAWN_INTERVAL - (level - 1) * 30);
+}
+
+function getAvgLettersPerMonster() {
+  const maxLetters = Math.floor((level - 1) / 10) + 1;
+  if (maxLetters === 1) return 1;
+  const tierProgress = ((level - 1) % 10) / 9;
+  const multiChance = 0.1 + tierProgress * 0.9;
+  // Expected value: multiChance * maxLetters + (1-multiChance) * avg(1..maxLetters-1)
+  const avgShorter = maxLetters / 2; // avg of 1..maxLetters-1
+  return multiChance * maxLetters + (1 - multiChance) * avgShorter;
+}
+
+function getLPS() {
+  const monstersPerSec = 1000 / getSpawnInterval();
+  return (getAvgLettersPerMonster() * monstersPerSec).toFixed(1);
 }
 
 // ── Draw helpers ───────────────────────────────────────────
@@ -239,6 +257,11 @@ levelText.x = 14;
 levelText.y = 70;
 app.stage.addChild(levelText);
 
+const lpsText = new Text({ text: `LPS: ${getLPS()}`, style: uiStyle });
+lpsText.x = 14;
+lpsText.y = 98;
+app.stage.addChild(lpsText);
+
 const gameOverText = new Text({
   text: "GAME OVER\nPress Space to restart",
   style: new TextStyle({
@@ -253,6 +276,21 @@ gameOverText.x = app.screen.width / 2;
 gameOverText.y = app.screen.height / 2;
 gameOverText.visible = false;
 app.stage.addChild(gameOverText);
+
+const winText = new Text({
+  text: "YOU WIN!\nPress Space to restart",
+  style: new TextStyle({
+    fontFamily: "monospace",
+    fontSize: 42,
+    fill: 0x2ecc71,
+    align: "center",
+  }),
+});
+winText.anchor.set(0.5);
+winText.x = app.screen.width / 2;
+winText.y = app.screen.height / 2;
+winText.visible = false;
+app.stage.addChild(winText);
 
 const pauseText = new Text({
   text: "PAUSED\nPress Space to resume",
@@ -285,27 +323,38 @@ function getWordLength() {
   return Math.ceil(Math.random() * (maxLetters - 1));
 }
 
-function spawnMonster() {
-  if (gameOver) return;
-
-  const wordLen = getWordLength();
-
-  // Pick letters not already used as a first-letter on an active monster
+function pickWord(wordLen) {
+  // Collect first letters already in use by active monsters
   const activeFirstLetters = new Set(
     monsters.filter((m) => !m.dying).map((m) => m.word[m.hitIndex])
   );
-  const available = LETTERS.split("").filter(
-    (l) => !activeFirstLetters.has(l)
-  );
-  if (available.length === 0) return;
 
-  // Build a random word of the required length
-  let word = "";
-  const pool = [...LETTERS];
-  for (let i = 0; i < wordLen; i++) {
-    const src = i === 0 ? available : pool;
-    word += src[Math.floor(Math.random() * src.length)];
+  if (wordLen === 1) {
+    const available = LETTERS.split("").filter(
+      (l) => !activeFirstLetters.has(l)
+    );
+    if (available.length === 0) return null;
+    return available[Math.floor(Math.random() * available.length)];
   }
+
+  // For multi-letter, pick from real English word substrings
+  const pool = substrings[String(wordLen)];
+  if (!pool || pool.length === 0) return null;
+
+  // Shuffle candidates and find one whose first letter isn't taken
+  for (let attempts = 0; attempts < 60; attempts++) {
+    const candidate = pool[Math.floor(Math.random() * pool.length)];
+    if (!activeFirstLetters.has(candidate[0])) return candidate;
+  }
+  return null;
+}
+
+function spawnMonster() {
+  if (gameOver || gameWon) return;
+
+  const wordLen = getWordLength();
+  const word = pickWord(wordLen);
+  if (!word) return;
 
   const m = createMonster(word);
 
@@ -316,7 +365,7 @@ function spawnMonster() {
 
   // Speed: both bounds grow with level, capped at level 10 values
   const speedLevel = Math.min(level, 10);
-  const minSpeed = MONSTER_SPEED + (speedLevel - 1) * 0.15;
+  const minSpeed = MONSTER_SPEED + (speedLevel - 1) * 0.06;
   const maxSpeed = MONSTER_SPEED + (speedLevel - 1) * 0.5;
   m.speed = minSpeed + Math.random() * (maxSpeed - minSpeed);
 
@@ -347,8 +396,31 @@ app.stage.addChild(stunText);
 
 // ── Input ──────────────────────────────────────────────────
 window.addEventListener("keydown", (e) => {
-  if (gameOver) {
+  if (gameOver || gameWon) {
     if (e.code === "Space") restartGame();
+    return;
+  }
+
+  if (e.code === "Escape") {
+    const wasPaused = paused;
+    paused = true;
+    pauseText.visible = true;
+    const input = prompt("Enter a starting level (1-60):");
+    if (input !== null) {
+      const n = parseInt(input, 10);
+      if (n >= 1 && n <= MAX_LEVEL) {
+        restartGame();
+        level = n;
+        score = (n - 1) * 10;
+        scoreText.text = `Score: ${score}`;
+        levelText.text = `Level: ${level}`;
+        lpsText.text = `LPS: ${getLPS()}`;
+        return;
+      }
+    }
+    // Restore previous pause state if cancelled or invalid
+    paused = wasPaused;
+    pauseText.visible = wasPaused;
     return;
   }
 
@@ -410,13 +482,16 @@ function restartGame() {
   lives = 3;
   level = 1;
   gameOver = false;
+  gameWon = false;
   paused = false;
   stunUntil = 0;
   scoreText.text = "Score: 0";
   pauseText.visible = false;
   livesText.text = "Lives: 3";
   levelText.text = "Level: 1";
+  lpsText.text = `LPS: ${getLPS()}`;
   gameOverText.visible = false;
+  winText.visible = false;
   spawnTimer = 0;
 }
 
@@ -439,7 +514,7 @@ app.ticker.add((ticker) => {
     stunText.alpha = 0.6 + Math.sin(tick * 0.2) * 0.4;
   }
 
-  if (gameOver || paused) return;
+  if (gameOver || gameWon || paused) return;
 
   // Spawn timer
   const interval = getSpawnInterval();
@@ -521,13 +596,20 @@ app.ticker.add((ticker) => {
         // All letters hit — kill it
         score++;
         scoreText.text = `Score: ${score}`;
-        const newLevel = Math.floor(score / 10) + 1;
+        const newLevel = Math.min(Math.floor(score / 10) + 1, MAX_LEVEL + 1);
         if (newLevel !== level) {
           level = newLevel;
-          levelText.text = `Level: ${level}`;
+          levelText.text = `Level: ${Math.min(level, MAX_LEVEL)}`;
+          lpsText.text = `LPS: ${getLPS()}`;
         }
         t.dying = true;
         t.dyingVy = -2;
+
+        // Win condition: beat level 60
+        if (level > MAX_LEVEL) {
+          gameWon = true;
+          winText.visible = true;
+        }
       }
 
       app.stage.removeChild(b.gfx);
