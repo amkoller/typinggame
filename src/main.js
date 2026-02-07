@@ -338,8 +338,8 @@ function createBullet(x, y, targetX, targetY) {
   const dist = Math.sqrt(dx * dx + dy * dy);
   return {
     gfx: bullet,
-    vx: (dx / dist) * 14,
-    vy: (dy / dist) * 14,
+    vx: (dx / dist) * 28,
+    vy: (dy / dist) * 28,
     targetX,
     targetY,
     alive: true,
@@ -728,7 +728,7 @@ app.ticker.add((ticker) => {
     const dx = b.target.container.x - b.gfx.x;
     const dy = b.target.container.y - b.gfx.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    const speed = 14;
+    const speed = 28;
     b.vx = (dx / dist) * speed;
     b.vy = (dy / dist) * speed;
 
