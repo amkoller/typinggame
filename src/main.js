@@ -7,6 +7,9 @@ await app.init({
   resizeTo: window,
   backgroundColor: 0x1a1a2e,
   antialias: true,
+  roundPixels: true,
+  resolution: window.devicePixelRatio || 1,
+  autoDensity: true,
 });
 
 document.body.appendChild(app.canvas);
@@ -239,6 +242,7 @@ function createMonster(word) {
         fontWeight: "bold",
         fill: 0x2c3e50,
       }),
+      resolution: 4,
     });
     lt.anchor.set(0.5);
     lt.x = bx;
