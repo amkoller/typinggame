@@ -389,13 +389,20 @@ app.ticker.add((ticker) => {
   // Update bullets
   for (let i = bullets.length - 1; i >= 0; i--) {
     const b = bullets[i];
+
+    // Re-aim toward current target position every frame
+    const dx = b.target.container.x - b.gfx.x;
+    const dy = b.target.container.y - b.gfx.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const speed = 14;
+    b.vx = (dx / dist) * speed;
+    b.vy = (dy / dist) * speed;
+
     b.gfx.x += b.vx * dt;
     b.gfx.y += b.vy * dt;
 
     // Check if bullet reached target area
-    const dx = b.gfx.x - b.target.container.x;
-    const dy = b.gfx.y - b.target.container.y;
-    if (dx * dx + dy * dy < 400) {
+    if (dist < 20) {
       // Hit!
       score++;
       scoreText.text = `Score: ${score}`;
