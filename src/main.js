@@ -21,11 +21,11 @@ const SPAWN_INTERVAL = 2000; // ms
 const PLAYER_X = 100;
 const MAX_LEVEL = 60;
 const BOSS_LEVELS = {
-  10: { type: "skeleton", name: "SKELETON", wordCount: 7, wordLen: 3, speed: 0.3 },
-  20: { type: "ghost", name: "GHOST", wordCount: 8, wordLen: 4, speed: 0.25 },
-  30: { type: "shark", name: "LASER SHARK", wordCount: 12, wordLen: 4, speed: 0.2 },
-  40: { type: "demon", name: "FIRE DEMON", wordCount: 15, wordLen: 5, speed: 0.15 },
-  50: { type: "skull", name: "ZOMBIE SKULL", wordCount: 20, wordLen: 5, speed: 0.1 },
+  10: { type: "skeleton", name: "SKELETON", wordCount: 7, wordLen: 3, speed: 0.9 },
+  20: { type: "ghost", name: "GHOST", wordCount: 8, wordLen: 4, speed: 0.75 },
+  30: { type: "shark", name: "LASER SHARK", wordCount: 12, wordLen: 4, speed: 0.6 },
+  40: { type: "demon", name: "FIRE DEMON", wordCount: 15, wordLen: 5, speed: 0.45 },
+  50: { type: "skull", name: "ZOMBIE SKULL", wordCount: 20, wordLen: 5, speed: 0.3 },
 };
 
 let monsters = [];
@@ -127,30 +127,54 @@ let musicStep = 0;
 let nextNoteTime = 0;
 let musicTimerId = null;
 
-// C-minor melody (32 eighth-note steps)
+// ── Section A (C minor) ──
 // C5=523, D5=587, Eb5=622, F5=698, G5=784, Bb4=466, Ab4=415
-const melodyNotes = [
+const melodyA = [
   523, 0, 622, 0, 784, 0, 622, 698,
   784, 0, 622, 0, 523, 0, 466, 0,
   415, 0, 523, 0, 622, 0, 698, 622,
   587, 0, 523, 0, 466, 0, 523, 0,
 ];
-
-// Bass line (32 steps)
-// C3=131, G2=98, Ab2=104, Eb3=156, F3=175
-const bassNotes = [
+const bassA = [
   131, 0, 131, 0, 98, 0, 98, 0,
   104, 0, 104, 0, 156, 0, 156, 0,
   175, 0, 175, 0, 131, 0, 131, 0,
   98, 0, 98, 0, 131, 0, 131, 0,
 ];
-
-// Drums: 1=kick, 2=hi-hat
-const drumHits = [
+const drumsA = [
   1, 0, 2, 0, 1, 0, 2, 0,
   1, 0, 2, 0, 1, 0, 2, 2,
   1, 0, 2, 0, 1, 0, 2, 0,
   1, 0, 2, 2, 1, 2, 1, 2,
+];
+
+// ── Section B (Eb major — brighter contrast) ──
+// Eb5=622, F5=698, G5=784, Ab5=831, Bb5=932, C6=1047
+const melodyB = [
+  784, 0, 932, 0, 1047, 0, 932, 831,
+  784, 0, 698, 0, 622, 0, 698, 0,
+  831, 0, 932, 0, 1047, 932, 831, 0,
+  784, 0, 698, 622, 587, 0, 523, 0,
+];
+const bassB = [
+  156, 0, 156, 0, 117, 0, 117, 0,
+  104, 0, 104, 0, 175, 0, 175, 0,
+  156, 0, 156, 0, 117, 0, 117, 0,
+  104, 0, 175, 0, 98, 0, 131, 0,
+];
+const drumsB = [
+  1, 0, 2, 2, 1, 0, 2, 0,
+  1, 2, 1, 0, 2, 0, 1, 2,
+  1, 0, 2, 2, 1, 0, 2, 0,
+  1, 2, 2, 0, 1, 0, 1, 2,
+];
+
+// AABA form: 4 sections × 32 steps = 128 steps per cycle
+const formSections = [
+  { melody: melodyA, bass: bassA, drums: drumsA },
+  { melody: melodyA, bass: bassA, drums: drumsA },
+  { melody: melodyB, bass: bassB, drums: drumsB },
+  { melody: melodyA, bass: bassA, drums: drumsA },
 ];
 
 function getMusicTempo() {
@@ -204,10 +228,11 @@ function scheduleMusicNotes() {
   }
   while (nextNoteTime < audioCtx.currentTime + 0.1) {
     const dur = getMusicTempo();
-    const idx = musicStep % melodyNotes.length;
-    playMusicNote(melodyNotes[idx], nextNoteTime, dur * 0.8, "square", 0.05);
-    playMusicNote(bassNotes[idx], nextNoteTime, dur * 0.9, "triangle", 0.045);
-    if (drumHits[idx]) playDrumHit(drumHits[idx], nextNoteTime);
+    const section = formSections[Math.floor((musicStep % 128) / 32)];
+    const idx = musicStep % 32;
+    playMusicNote(section.melody[idx], nextNoteTime, dur * 0.8, "square", 0.05);
+    playMusicNote(section.bass[idx], nextNoteTime, dur * 0.9, "triangle", 0.045);
+    if (section.drums[idx]) playDrumHit(section.drums[idx], nextNoteTime);
     nextNoteTime += dur;
     musicStep++;
   }
@@ -553,12 +578,113 @@ function drawSkeleton(container) {
   return g;
 }
 
+function drawGhost(container) {
+  const g = new Graphics();
+  const px = 4;
+  const top = -70;
+
+  // 16-wide × 23-tall pixel grid
+  const data = [
+    "    GGGGGGGG    ",
+    "  GGGGGGGGGGGG  ",
+    " GGGGGGGGGGGGGG ",
+    "GGGGGGGGGGGGGGGG",
+    "GGGGGGGGGGGGGGGG",
+    "GGGEEGGGGGGEEGGG",
+    "GGGEPGGGGGGEPGGG",
+    "GGGEEGGGGGGEEGGG",
+    "GGGGGGGGGGGGGGGG",
+    "GGGGGGGGGGGGGGGG",
+    "GGGGGMMMMMMGGGGG",
+    "GGGGMMMMMMMMGGGG",
+    "GGGGGMMMMMMGGGGG",
+    "GGGGGGGGGGGGGGGG",
+    "GGGGGGGGGGGGGGGG",
+    "GGGGGGGGGGGGGGGG",
+    "GGGGGGGGGGGGGGGG",
+    "GGGGGGGGGGGGGGGG",
+    "GGGGGGGGGGGGGGGG",
+    "GG GGGG  GGGG GG",
+    "G   GG    GG   G",
+    "    GG    GG    ",
+    "     G     G    ",
+  ];
+
+  const colors = { G: 0xddeeff, E: 0x222244, P: 0x8888ff, M: 0x333355 };
+  const halfW = (data[0].length * px) / 2;
+
+  for (let r = 0; r < data.length; r++) {
+    for (let c = 0; c < data[r].length; c++) {
+      const ch = data[r][c];
+      if (ch === " ") continue;
+      g.rect(c * px - halfW, top + r * px, px, px);
+      g.fill(colors[ch]);
+    }
+  }
+
+  g.alpha = 0.85;
+  container.addChild(g);
+  return g;
+}
+
+function drawShark(container) {
+  const g = new Graphics();
+  const px = 4;
+  const top = -30;
+
+  // 24-wide × 14-tall pixel grid — shark facing left
+  const data = [
+    "          FF            ",
+    "         FFFF           ",
+    "    BBBBBBBBBBBBB       ",
+    "   BBBBBBBBBBBBBBBBB    ",
+    "  RRBBEBBBBBBBBBBBBBBF  ",
+    "  RRBBBBBBBBBBBBBBBBBFF ",
+    "   BBBBBBBBBBBBBBBBBFFFF",
+    "   LLLLLLLLLLLLLLLLBFFFF",
+    "   LLLLLLLLLLLLLLLLBBFF ",
+    "  TTLLLLLLLLLLLLLLLLBB  ",
+    "  MTTLLLLLLLLLLLLLLLB   ",
+    "   TTLLLLLLLLLLLLLLB    ",
+    "     LLLLLLLLLLLLL      ",
+    "       FFFFFFFF         ",
+  ];
+
+  const colors = {
+    B: 0x556677, L: 0x8899aa, F: 0x3a4a5a,
+    T: 0xffffff, E: 0xff2222, R: 0xcc0000, M: 0x111111,
+  };
+  const halfW = (data[0].length * px) / 2;
+
+  for (let r = 0; r < data.length; r++) {
+    for (let c = 0; c < data[r].length; c++) {
+      const ch = data[r][c];
+      if (ch === " ") continue;
+      g.rect(c * px - halfW, top + r * px, px, px);
+      g.fill(colors[ch]);
+    }
+  }
+
+  // Laser beam from snout — red line extending left
+  g.moveTo(-halfW + 2 * px, top + 4 * px + px / 2);
+  g.lineTo(-halfW - 40, top + 4 * px + px / 2);
+  g.stroke({ width: 2, color: 0xff0000 });
+  g.moveTo(-halfW + 2 * px, top + 5 * px + px / 2);
+  g.lineTo(-halfW - 40, top + 5 * px + px / 2);
+  g.stroke({ width: 2, color: 0xff0000 });
+
+  container.addChild(g);
+  return g;
+}
+
 function createBoss(bossConfig) {
   const container = new Container();
   const { type, name, wordCount, wordLen, speed } = bossConfig;
 
   // Draw the boss body
   if (type === "skeleton") drawSkeleton(container);
+  else if (type === "ghost") drawGhost(container);
+  else if (type === "shark") drawShark(container);
 
   // Blood layer
   const bloodContainer = new Container();
