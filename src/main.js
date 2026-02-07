@@ -18,8 +18,9 @@ const PLAYER_X = 100;
 
 let monsters = [];
 let score = 0;
-let lives = 5;
+let lives = 3;
 let gameOver = false;
+let stunUntil = 0; // timestamp when stun ends (miss penalty)
 
 // ── Draw helpers ───────────────────────────────────────────
 
@@ -206,7 +207,7 @@ scoreText.x = 14;
 scoreText.y = 14;
 app.stage.addChild(scoreText);
 
-const livesText = new Text({ text: "Lives: 5", style: uiStyle });
+const livesText = new Text({ text: "Lives: 3", style: uiStyle });
 livesText.x = 14;
 livesText.y = 42;
 app.stage.addChild(livesText);
@@ -252,6 +253,22 @@ let spawnTimer = 0;
 // ── Bullets ────────────────────────────────────────────────
 let bullets = [];
 
+// ── Stun UI ───────────────────────────────────────────────
+const stunText = new Text({
+  text: "STUNNED!",
+  style: new TextStyle({
+    fontFamily: "monospace",
+    fontSize: 24,
+    fill: 0xe74c3c,
+    fontWeight: "bold",
+  }),
+});
+stunText.anchor.set(0.5);
+stunText.x = PLAYER_X;
+stunText.y = app.screen.height / 2 - 60;
+stunText.visible = false;
+app.stage.addChild(stunText);
+
 // ── Input ──────────────────────────────────────────────────
 window.addEventListener("keydown", (e) => {
   if (gameOver) {
@@ -262,12 +279,19 @@ window.addEventListener("keydown", (e) => {
   const key = e.key.toUpperCase();
   if (key.length !== 1 || !LETTERS.includes(key)) return;
 
+  // Can't shoot while stunned
+  if (Date.now() < stunUntil) return;
+
   // Find the closest monster with this letter
   const target = monsters
     .filter((m) => m.letter === key && !m.dying)
     .sort((a, b) => a.container.x - b.container.x)[0];
 
-  if (!target) return;
+  if (!target) {
+    // Typed a wrong letter — stunned for 3 seconds
+    stunUntil = Date.now() + 3000;
+    return;
+  }
 
   // Shoot!
   const bullet = createBullet(
@@ -278,9 +302,6 @@ window.addEventListener("keydown", (e) => {
   );
   bullet.target = target;
   bullets.push(bullet);
-
-  // Mark monster as dying immediately so we don't double-shoot
-  target.dying = true;
 });
 
 // ── Restart ────────────────────────────────────────────────
@@ -290,10 +311,11 @@ function restartGame() {
   monsters = [];
   bullets = [];
   score = 0;
-  lives = 5;
+  lives = 3;
   gameOver = false;
+  stunUntil = 0;
   scoreText.text = "Score: 0";
-  livesText.text = "Lives: 5";
+  livesText.text = "Lives: 3";
   gameOverText.visible = false;
   spawnTimer = 0;
 }
@@ -308,6 +330,14 @@ app.ticker.add((ticker) => {
   // Player hover animation
   player.y = app.screen.height / 2 + Math.sin(tick * 0.04) * 12;
   drawFlame(flame, tick);
+
+  // Stun indicator
+  const stunned = Date.now() < stunUntil;
+  stunText.visible = stunned;
+  stunText.y = player.y - 60;
+  if (stunned) {
+    stunText.alpha = 0.6 + Math.sin(tick * 0.2) * 0.4;
+  }
 
   if (gameOver) return;
 
