@@ -207,6 +207,7 @@ function getLPS() {
 
 // ── Sound effects (Web Audio API) ──────────────────────────
 let soundEnabled = true;
+let bloodEnabled = false;
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
 function playShoot() {
@@ -1377,6 +1378,16 @@ window.addEventListener("keydown", (e) => {
     return;
   }
 
+  if (e.code === "Backslash") {
+    bloodEnabled = !bloodEnabled;
+    if (!bloodEnabled) {
+      for (const p of bloodParticles) app.stage.removeChild(p.gfx);
+      bloodParticles = [];
+      for (const m of monsters) m.bloodContainer.removeChildren();
+    }
+    return;
+  }
+
   if (e.code === "Escape") {
     const wasPaused = paused;
     paused = true;
@@ -1629,7 +1640,7 @@ app.ticker.add((ticker) => {
       }
       t.hitIndex++;
       playHit();
-      spawnBlood(t.container.x, t.container.y, 8);
+      if (bloodEnabled) spawnBlood(t.container.x, t.container.y, 8);
 
       // Update boss HP bar
       if (t.updateHpBar) t.updateHpBar(t.hitIndex, t.word.length);
@@ -1640,7 +1651,7 @@ app.ticker.add((ticker) => {
       if (t.hitIndex >= t.word.length) {
         // All letters hit — kill it
         playKill();
-        spawnBlood(t.container.x, t.container.y, t.isBoss ? 60 : 25);
+        if (bloodEnabled) spawnBlood(t.container.x, t.container.y, t.isBoss ? 60 : 25);
 
         const killPoints = t.isBoss ? 10 : 1;
         score += killPoints;
@@ -1665,7 +1676,7 @@ app.ticker.add((ticker) => {
         }
       } else {
         // Non-kill hit — add persistent blood on monster body
-        if (!t.isBoss) addMonsterBlood(t);
+        if (bloodEnabled && !t.isBoss) addMonsterBlood(t);
       }
 
       app.stage.removeChild(b.gfx);
