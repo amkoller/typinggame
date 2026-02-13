@@ -183,6 +183,7 @@ let paused = false;
 let stunUntil = 0; // timestamp when stun ends (miss penalty)
 let bossActive = false;
 let letterSetIndex = 0;
+let monsterSpawnCount = 0;
 
 function getSpawnInterval() {
   // 2000ms at level 1, decreasing by 25ms per level, min 550ms
@@ -1577,18 +1578,33 @@ function spawnMonster() {
   const word = pickWord(wordLen);
   if (!word) return;
 
+  // Speed: both bounds grow with level, capped at level 10 values
+  const speedLevel = Math.min(level, 10);
+  const minSpeed = MONSTER_SPEED + (speedLevel - 1) * 0.06;
+  const maxSpeed = MONSTER_SPEED + (speedLevel - 1) * 0.5;
+
+  // Check for bonus monster (1/50 chance per spawn, never during boss levels)
+  monsterSpawnCount++;
+  const isBonus = Math.random() < 1 / 50;
+
   const m = createMonster(word);
+
+  if (isBonus) {
+    m.isBonus = true;
+    // Tint body yellow
+    m.container.children[0].tint = 0xffdd00;
+    // Add flashing flame above monster
+    const bonusFlame = new Graphics();
+    m.container.addChild(bonusFlame);
+    m.bonusFlame = bonusFlame;
+  }
 
   m.container.x = app.screen.width + 40;
   m.container.y = 60 + Math.random() * (app.screen.height - 140);
   m.dying = false;
   m.dyingVy = 0;
 
-  // Speed: both bounds grow with level, capped at level 10 values
-  const speedLevel = Math.min(level, 10);
-  const minSpeed = MONSTER_SPEED + (speedLevel - 1) * 0.06;
-  const maxSpeed = MONSTER_SPEED + (speedLevel - 1) * 0.5;
-  m.speed = minSpeed + Math.random() * (maxSpeed - minSpeed);
+  m.speed = isBonus ? maxSpeed * 1.2 : minSpeed + Math.random() * (maxSpeed - minSpeed);
 
   app.stage.addChild(m.container);
   monsters.push(m);
@@ -1804,6 +1820,7 @@ function restartGame() {
   bloodParticles = [];
   score = 0;
   levelKills = 0;
+  monsterSpawnCount = 0;
   lives = 3;
   level = 1;
   gameOver = false;
@@ -1856,6 +1873,22 @@ app.ticker.add((ticker) => {
   for (let i = monsters.length - 1; i >= 0; i--) {
     const m = monsters[i];
 
+
+    // Animate bonus flame
+    if (m.bonusFlame && !m.dying) {
+      const bf = m.bonusFlame;
+      bf.clear();
+      const px = 3;
+      const flicker = Math.sin(tick * 0.4) * px;
+      const fy = -36 - (m.word.length - 1) * 3;
+      const bright = Math.sin(tick * 0.25) > 0 ? 0xff0000 : 0xff4400;
+      bf.rect(-px, fy - px * 3 + flicker, px * 2, px * 3);
+      bf.fill(bright);
+      bf.rect(-px * 2, fy - px * 2 + flicker, px * 4, px * 2);
+      bf.fill(0xff6600);
+      bf.rect(-px, fy - px + flicker, px * 2, px);
+      bf.fill(0xffaa00);
+    }
 
     if (m.dying) {
       // Fall down
@@ -1948,7 +1981,14 @@ app.ticker.add((ticker) => {
 
         const wordLen = t.word.replace(/ /g, "").length;
         const pointTable = { 1: 10, 2: 20, 3: 30, 4: 50, 5: 80 };
-        const killPoints = t.isBoss ? level * 20 : (pointTable[wordLen] || wordLen * 10);
+        let killPoints;
+        if (t.isBonus) {
+          killPoints = 250;
+          lives++;
+          livesText.text = `Lives: ${lives}`;
+        } else {
+          killPoints = t.isBoss ? level * 20 : (pointTable[wordLen] || wordLen * 10);
+        }
         score += killPoints;
         scoreText.text = `Score: ${score}`;
 
