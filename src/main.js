@@ -16,6 +16,12 @@ document.body.appendChild(app.canvas);
 
 // ── Constants ──────────────────────────────────────────────
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const LETTER_SETS = [
+  { name: "Beginner", letters: "ASDFJKLERUIGH" },
+  { name: "Apprentice", letters: "ASDFJKLERUIGHCVBN" },
+  { name: "Journeyman", letters: "ASDFJKLERUIGHCVBNMOPW" },
+  { name: "Master", letters: LETTERS },
+];
 const MONSTER_SPEED = 1.2;
 const SPAWN_INTERVAL = 1000; // ms
 const BASE_BULLET_SPEED = 28;
@@ -176,10 +182,11 @@ let gameWon = false;
 let paused = false;
 let stunUntil = 0; // timestamp when stun ends (miss penalty)
 let bossActive = false;
+let letterSetIndex = 0;
 
 function getSpawnInterval() {
   // 2000ms at level 1, decreasing by 25ms per level, min 550ms
-  return Math.max(550, SPAWN_INTERVAL - (level - 1) * 10);
+  return Math.max(700, SPAWN_INTERVAL - (level - 1) * 5);
 }
 
 function getAvgLettersPerMonster() {
@@ -1153,17 +1160,20 @@ function createBoss(bossConfig) {
   const bloodContainer = new Container();
   container.addChild(bloodContainer);
 
-  // Generate real English words for the boss
+  // Generate real English words for the boss, filtered by active letter set
+  const allowed = new Set(LETTER_SETS[letterSetIndex].letters.split(""));
   const words = [];
-  const pool = BOSS_WORDS[wordLen] || [];
+  const rawPool = BOSS_WORDS[wordLen] || [];
+  const pool = rawPool.filter((w) => [...w].every((ch) => allowed.has(ch)));
   const used = new Set();
   for (let i = 0; i < wordCount; i++) {
     let word;
+    const src = pool.length > 0 ? pool : rawPool;
     for (let a = 0; a < 60; a++) {
-      const candidate = pool[Math.floor(Math.random() * pool.length)];
+      const candidate = src[Math.floor(Math.random() * src.length)];
       if (!used.has(candidate)) { word = candidate; break; }
     }
-    if (!word) word = pool[Math.floor(Math.random() * pool.length)];
+    if (!word) word = src[Math.floor(Math.random() * src.length)];
     used.add(word);
     words.push(word);
   }
@@ -1351,6 +1361,11 @@ lpsText.x = 14;
 lpsText.y = 98;
 app.stage.addChild(lpsText);
 
+const letterSetText = new Text({ text: `Letters: ${LETTER_SETS[letterSetIndex].name}`, style: uiStyle });
+letterSetText.x = 14;
+letterSetText.y = 126;
+app.stage.addChild(letterSetText);
+
 const soundText = new Text({ text: "Sound: ON", style: uiStyle });
 soundText.anchor.set(1, 0);
 soundText.x = app.screen.width - 14;
@@ -1416,26 +1431,36 @@ function getWordLength() {
 }
 
 function pickWord(wordLen) {
+  const allowed = new Set(LETTER_SETS[letterSetIndex].letters.split(""));
+
   // Collect first letters already in use by active monsters
   const activeFirstLetters = new Set(
     monsters.filter((m) => !m.dying).map((m) => m.word[m.hitIndex])
   );
 
   if (wordLen === 1) {
-    const available = LETTERS.split("").filter(
+    const available = LETTER_SETS[letterSetIndex].letters.split("").filter(
       (l) => !activeFirstLetters.has(l)
     );
     if (available.length === 0) return null;
     return available[Math.floor(Math.random() * available.length)];
   }
 
-  // For multi-letter, pick from real English word substrings
+  // For multi-letter, pick from words that only use allowed letters
   const pool = substrings[String(wordLen)];
   if (!pool || pool.length === 0) return null;
 
-  // Shuffle candidates and find one whose first letter isn't taken
+  // Pre-filter pool by allowed letters (cached per set to avoid re-filtering)
+  const cacheKey = `_filtered_${letterSetIndex}`;
+  if (!pool[cacheKey]) {
+    pool[cacheKey] = pool.filter((w) => [...w].every((ch) => allowed.has(ch)));
+  }
+  const filtered = pool[cacheKey];
+  if (filtered.length === 0) return null;
+
+  // Pick from filtered pool, avoiding duplicate first letters
   for (let attempts = 0; attempts < 60; attempts++) {
-    const candidate = pool[Math.floor(Math.random() * pool.length)];
+    const candidate = filtered[Math.floor(Math.random() * filtered.length)];
     if (!activeFirstLetters.has(candidate[0])) return candidate;
   }
   return null;
@@ -1543,6 +1568,13 @@ window.addEventListener("keydown", (e) => {
 
   if (gameOver || gameWon) {
     if (e.code === "Enter") restartGame();
+    return;
+  }
+
+  if (e.code === "Tab") {
+    e.preventDefault();
+    letterSetIndex = (letterSetIndex + 1) % LETTER_SETS.length;
+    letterSetText.text = `Letters: ${LETTER_SETS[letterSetIndex].name}`;
     return;
   }
 
