@@ -324,10 +324,62 @@ const formSections = [
   { melody: melodyA, bass: bassA, drums: drumsA },
 ];
 
+// ── Boss music (C# minor / diminished — dark and aggressive) ──
+// C#4=277, D#4=311, E4=330, F#4=370, G#4=415, A4=440, B4=494
+// C#5=554, D#5=622, E5=659, F#5=740, G#5=831
+// Steady driving rhythm — bass pumps every eighth note, kick on every beat
+const bossMelodyA = [
+  554, 554, 622, 622, 554, 554, 494, 494,
+  440, 440, 494, 494, 554, 554, 622, 622,
+  554, 554, 494, 494, 440, 440, 370, 370,
+  440, 440, 494, 494, 554, 554, 494, 494,
+];
+const bossBassA = [
+  139, 139, 139, 139, 139, 139, 139, 139,
+  117, 117, 117, 117, 117, 117, 117, 117,
+  110, 110, 110, 110, 110, 110, 110, 110,
+  117, 117, 117, 117, 139, 139, 139, 139,
+];
+const bossDrumsA = [
+  1, 2, 1, 2, 1, 2, 1, 2,
+  1, 2, 1, 2, 1, 2, 1, 2,
+  1, 2, 1, 2, 1, 2, 1, 2,
+  1, 2, 1, 2, 1, 2, 1, 2,
+];
+
+// Boss section B — climbing diminished tension, same steady pulse
+const bossMelodyB = [
+  554, 554, 659, 659, 784, 784, 659, 659,
+  554, 554, 494, 494, 440, 440, 494, 494,
+  554, 554, 659, 659, 784, 784, 932, 932,
+  784, 784, 659, 659, 554, 554, 494, 494,
+];
+const bossBassB = [
+  139, 139, 139, 139, 104, 104, 104, 104,
+  117, 117, 117, 117, 139, 139, 139, 139,
+  110, 110, 110, 110, 104, 104, 104, 104,
+  117, 117, 117, 117, 139, 139, 139, 139,
+];
+const bossDrumsB = [
+  1, 2, 1, 2, 1, 2, 1, 2,
+  1, 2, 1, 2, 1, 2, 1, 2,
+  1, 2, 1, 2, 1, 2, 1, 2,
+  1, 2, 1, 2, 1, 2, 1, 2,
+];
+
+const bossFormSections = [
+  { melody: bossMelodyA, bass: bossBassA, drums: bossDrumsA },
+  { melody: bossMelodyA, bass: bossBassA, drums: bossDrumsA },
+  { melody: bossMelodyB, bass: bossBassB, drums: bossDrumsB },
+  { melody: bossMelodyA, bass: bossBassA, drums: bossDrumsA },
+];
+
 function getMusicTempo() {
   // Eighth-note duration: BPM 140 at level 1 → BPM 220 at level 60
   const bpm = 140 + (Math.min(level, 60) - 1) * (80 / 59);
-  return 60 / bpm / 2;
+  const baseTempo = 60 / bpm / 2;
+  // Boss music plays 1.5x faster
+  return bossActive ? baseTempo / 1.5 : baseTempo;
 }
 
 function playMusicNote(freq, time, duration, type, vol) {
@@ -375,7 +427,8 @@ function scheduleMusicNotes() {
   }
   while (nextNoteTime < audioCtx.currentTime + 0.1) {
     const dur = getMusicTempo();
-    const section = formSections[Math.floor((musicStep % 128) / 32)];
+    const sections = bossActive ? bossFormSections : formSections;
+    const section = sections[Math.floor((musicStep % 128) / 32)];
     const idx = musicStep % 32;
     playMusicNote(section.melody[idx], nextNoteTime, dur * 0.8, "square", 0.05);
     playMusicNote(section.bass[idx], nextNoteTime, dur * 0.9, "triangle", 0.045);
