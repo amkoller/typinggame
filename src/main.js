@@ -18,6 +18,7 @@ document.body.appendChild(app.canvas);
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const MONSTER_SPEED = 1.2;
 const SPAWN_INTERVAL = 1000; // ms
+const BASE_BULLET_SPEED = 28;
 const PLAYER_X = 100;
 const MAX_LEVEL = 60;
 const BOSS_LEVELS = {
@@ -167,6 +168,7 @@ const BOSS_WORDS = {
 
 let monsters = [];
 let score = 0;
+let levelKills = 0;
 let lives = 3;
 let level = 1;
 let gameOver = false;
@@ -1399,7 +1401,8 @@ window.addEventListener("keydown", (e) => {
       if (n >= 1 && n <= MAX_LEVEL) {
         restartGame();
         level = n;
-        score = (n - 1) * 10;
+        score = 0;
+        levelKills = 0;
         scoreText.text = `Score: ${score}`;
         levelText.text = `Level: ${level}`;
         lpsText.text = `LPS: ${getLPS()}`;
@@ -1511,6 +1514,7 @@ function restartGame() {
   bullets = [];
   bloodParticles = [];
   score = 0;
+  levelKills = 0;
   lives = 3;
   level = 1;
   gameOver = false;
@@ -1612,7 +1616,7 @@ app.ticker.add((ticker) => {
     const dx = b.target.container.x - b.gfx.x;
     const dy = b.target.container.y - b.gfx.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    const speed = 28;
+    const speed = BASE_BULLET_SPEED * (1 + level * 0.05);
     b.vx = (dx / dist) * speed;
     b.vy = (dy / dist) * speed;
 
@@ -1653,17 +1657,28 @@ app.ticker.add((ticker) => {
         playKill();
         if (bloodEnabled) spawnBlood(t.container.x, t.container.y, t.isBoss ? 60 : 25);
 
-        const killPoints = t.isBoss ? 10 : 1;
+        const wordLen = t.word.replace(/ /g, "").length;
+        const pointTable = { 1: 10, 2: 20, 3: 30, 4: 50, 5: 80 };
+        const killPoints = t.isBoss ? level * 20 : (pointTable[wordLen] || wordLen * 10);
         score += killPoints;
         scoreText.text = `Score: ${score}`;
 
         if (t.isBoss) bossActive = false;
 
-        const newLevel = Math.min(Math.floor(score / 10) + 1, MAX_LEVEL + 1);
-        if (newLevel !== level) {
-          level = newLevel;
+        // Level advancement: 10 regular kills or 1 boss kill
+        if (t.isBoss) {
+          levelKills = 0;
+          level = Math.min(level + 1, MAX_LEVEL + 1);
           levelText.text = `Level: ${Math.min(level, MAX_LEVEL)}`;
           lpsText.text = `LPS: ${getLPS()}`;
+        } else {
+          levelKills++;
+          if (levelKills >= 10) {
+            levelKills = 0;
+            level = Math.min(level + 1, MAX_LEVEL + 1);
+            levelText.text = `Level: ${Math.min(level, MAX_LEVEL)}`;
+            lpsText.text = `LPS: ${getLPS()}`;
+          }
         }
         t.dying = true;
         t.dyingVy = -2;
