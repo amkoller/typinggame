@@ -456,48 +456,187 @@ function drawFlame(flame, tick) {
 function createMonster(word) {
   const container = new Container();
   const letterCount = word.length;
-  // Scale the body wider for multi-letter monsters
-  const bodyHalfW = 18 + (letterCount - 1) * 10;
-  const bodyH = 38 + (letterCount - 1) * 6;
-  const bodyTop = -16 - (letterCount - 1) * 3;
-  const scale = 1 + (letterCount - 1) * 0.25;
+  const px = 3;
 
   const body = new Graphics();
-  // Body – orange rounded rectangle
-  body.roundRect(-bodyHalfW, bodyTop, bodyHalfW * 2, bodyH, 8);
-  body.fill(0xe67e22);
-  // Feet
-  body.circle(-10 * scale, bodyTop + bodyH + 2, 5 * scale);
-  body.circle(10 * scale, bodyTop + bodyH + 2, 5 * scale);
-  body.fill(0xd35400);
-  // Arms
-  body.roundRect(-bodyHalfW - 12, -2, 12, 6 * scale, 3);
-  body.roundRect(bodyHalfW, -2, 12, 6 * scale, 3);
-  body.fill(0xe67e22);
-  // Eyes
-  body.circle(-7 * scale, -6 - (letterCount - 1) * 2, 5);
-  body.circle(7 * scale, -6 - (letterCount - 1) * 2, 5);
-  body.fill(0xffffff);
-  body.circle(-7 * scale, -6 - (letterCount - 1) * 2, 2.5);
-  body.circle(7 * scale, -6 - (letterCount - 1) * 2, 2.5);
-  body.fill(0x111111);
-  // Mouth
-  body.circle(0, 6 - (letterCount - 1), 4);
-  body.fill(0x111111);
+
+  // Pixel art monster — tier based on letter count, scarier with more letters
+  // Colors: B=body, D=dark body, H=horn, R=red eye, T=teeth, C=claw, M=mouth, S=shadow
+  if (letterCount <= 1) {
+    // Tier 1: Small imp — stubby horns, red eyes, small claws
+    const data = [
+      "    HH    HH    ",
+      "    HH    HH    ",
+      "   BBBBBBBBBB   ",
+      "  BBBBBBBBBBBB  ",
+      "  BBRRBBBBRBB  ",
+      "  BBRRBBBBRBB  ",
+      "  BBBBBBBBBBBB  ",
+      "  BBBTTTTTTBBB  ",
+      "  BBBTBBBBTBBB  ",
+      "   BBBBBBBBBB   ",
+      " CC BBBBBBBB CC ",
+      " CC BBBBBBBB CC ",
+      "    BBBBBBBB    ",
+      "    BB    BB    ",
+      "    BB    BB    ",
+      "   CC      CC   ",
+    ];
+    const colors = { B: 0x888888, D: 0x666666, H: 0xaaaaaa, R: 0xff0000, T: 0xdddddd, C: 0xaa3333, M: 0x222222, S: 0x555555 };
+    const halfW = (data[0].length * px) / 2;
+    const top = -28;
+    for (let r = 0; r < data.length; r++) {
+      for (let c = 0; c < data[r].length; c++) {
+        const ch = data[r][c];
+        if (ch === " ") continue;
+        body.rect(c * px - halfW, top + r * px, px, px);
+        body.fill(colors[ch]);
+      }
+    }
+  } else if (letterCount <= 2) {
+    // Tier 2: Demon — taller horns, wider jaw, bigger claws
+    const data = [
+      "   HH        HH   ",
+      "   HHH      HHH   ",
+      "    HBBBBBBBBH     ",
+      "   BBBBBBBBBBBB    ",
+      "  BBBRRBBBBRRBBBB  ",
+      "  BBBRRBBBBRRBBBB  ",
+      "  BBBBBBBBBBBBBBBB ",
+      "  BBBBBBDDBBBBBBBB ",
+      "  BBBTTTTTTTTBBBB  ",
+      "  BBBTBBBBBBBTBBB  ",
+      "  BBBTTBBBBTTBBB   ",
+      "   BBBBBBBBBBBB    ",
+      "CC BBBBBBBBBBBB CC ",
+      "CCC BBBBBBBBBB CCC ",
+      "CC  BBBBBBBBBB  CC ",
+      "     BBB  BBB      ",
+      "     BBB  BBB      ",
+      "    CCC    CCC     ",
+    ];
+    const colors = { B: 0x777777, D: 0x555555, H: 0x999999, R: 0xff0000, T: 0xcccccc, C: 0x993333, M: 0x222222 };
+    const halfW = (data[0].length * px) / 2;
+    const top = -32;
+    for (let r = 0; r < data.length; r++) {
+      for (let c = 0; c < data[r].length; c++) {
+        const ch = data[r][c];
+        if (ch === " ") continue;
+        body.rect(c * px - halfW, top + r * px, px, px);
+        body.fill(colors[ch]);
+      }
+    }
+  } else if (letterCount <= 3) {
+    // Tier 3: Fiend — curved horns, triple eyes, fangs, arm claws
+    const data = [
+      "  HH            HH  ",
+      "  HHH          HHH  ",
+      "   HHH        HHH   ",
+      "    HBBBBBBBBBBH     ",
+      "   BBBBBBBBBBBBBB    ",
+      "  BBRRBBRRBBRRBBB   ",
+      "  BBRRBBRRBBRRBBB   ",
+      "  BBBBBBBBBBBBBBBB   ",
+      "  BBBBBBBBBBBBBBBB   ",
+      "  BBTTTTTTTTTTTBB    ",
+      "  BBTBBTBBBTBBTBB    ",
+      "  BBTTBBBBBBTTBBB    ",
+      "   BBBBBBBBBBBBBB    ",
+      "CCCBBBBBBBBBBBBBBCCC ",
+      "CCCCBBBBBBBBBBBBCCCC ",
+      "CCC BBBBBBBBBBBB CCC",
+      "     BBBBBBBBBB      ",
+      "     BBB  BBBB       ",
+      "     BBB  BBBB       ",
+      "    CCCC  CCCC       ",
+    ];
+    const colors = { B: 0x666666, D: 0x444444, H: 0x888888, R: 0xff0000, T: 0xbbbbbb, C: 0x883333, M: 0x111111 };
+    const halfW = (data[0].length * px) / 2;
+    const top = -36;
+    for (let r = 0; r < data.length; r++) {
+      for (let c = 0; c < data[r].length; c++) {
+        const ch = data[r][c];
+        if (ch === " ") continue;
+        body.rect(c * px - halfW, top + r * px, px, px);
+        body.fill(colors[ch]);
+      }
+    }
+  } else if (letterCount <= 4) {
+    // Tier 4: Brute — massive horns, quad eyes, heavy jaw, spiked arms
+    const data = [
+      " HH                HH ",
+      " HHH              HHH ",
+      "  HHH            HHH  ",
+      "  HHBBBBBBBBBBBBBBHH   ",
+      "  BBBBBBBBBBBBBBBBBB   ",
+      " BBRRBBRRBBRRBBRRBBB  ",
+      " BBRRBBRRBBRRBBRRBBB  ",
+      " BBBBBBBBBBBBBBBBBBB  ",
+      " BBBBBBBDDDDBBBBBBBB  ",
+      " BBTTTTTTTTTTTTTTBBB  ",
+      " BBTBBTBBBBBBTBBTBBB  ",
+      " BBTTBBBBBBBBBTTBBBB  ",
+      " BBBTTBBBBBBBBTTBBBB  ",
+      "  BBBBBBBBBBBBBBBBBB   ",
+      "CCCCBBBBBBBBBBBBBBCCCC ",
+      "CCCCCBBBBBBBBBBBBCCCCC ",
+      "CCCC BBBBBBBBBBBB CCCC",
+      "      BBBBBBBBBB       ",
+      "      BBBB  BBBB       ",
+      "      BBBB  BBBB       ",
+      "     CCCCC  CCCCC      ",
+    ];
+    const colors = { B: 0x555555, D: 0x333333, H: 0x777777, R: 0xff0000, T: 0xaaaaaa, C: 0x773333 };
+    const halfW = (data[0].length * px) / 2;
+    const top = -38;
+    for (let r = 0; r < data.length; r++) {
+      for (let c = 0; c < data[r].length; c++) {
+        const ch = data[r][c];
+        if (ch === " ") continue;
+        body.rect(c * px - halfW, top + r * px, px, px);
+        body.fill(colors[ch]);
+      }
+    }
+  } else {
+    // Tier 5: Abomination — crown of horns, six eyes, huge fangs, wing-claws
+    const data = [
+      "  HH  HH    HH  HH   ",
+      "  HHH HHH  HHH HHH   ",
+      "   HHHHHHHHHHHHHHHH    ",
+      "   HHBBBBBBBBBBBBHH    ",
+      "  BBBBBBBBBBBBBBBBBB   ",
+      " BBRRBBRRBBRRBBRRBBB  ",
+      " BBRRBBRRBBRRBBRRBBB  ",
+      " BBBBBBBBBBBBBBBBBBB  ",
+      " BBBBBBBDDDDDDBBBBBB  ",
+      " BBTTTTTTTTTTTTTTTBB  ",
+      " BBTBBTBBBBBBBTBBTBB  ",
+      " BBTTBBBBBBBBBBTTBBB  ",
+      " BBBTTBBBBBBBBTTBBBB  ",
+      " BBBBTTTBBBBBTTTBBBB  ",
+      "  BBBBBBBBBBBBBBBBB   ",
+      "CCCCCBBBBBBBBBBBBCCCCC",
+      "CCCCCCBBBBBBBBBBCCCCCC",
+      "CCCCC BBBBBBBBBB CCCCC",
+      "CCC   BBBBBBBBBB   CCC",
+      "       BBBB  BBBB      ",
+      "       BBBB  BBBB      ",
+      "      CCCCC  CCCCC     ",
+    ];
+    const colors = { B: 0x441100, D: 0x220800, H: 0x662200, R: 0xff0000, T: 0x999999, C: 0x660800 };
+    const halfW = (data[0].length * px) / 2;
+    const top = -40;
+    for (let r = 0; r < data.length; r++) {
+      for (let c = 0; c < data[r].length; c++) {
+        const ch = data[r][c];
+        if (ch === " ") continue;
+        body.rect(c * px - halfW, top + r * px, px, px);
+        body.fill(colors[ch]);
+      }
+    }
+  }
 
   container.addChild(body);
-
-  // Propeller beanie
-  const beanie = new Graphics();
-  beanie.arc(0, bodyTop, 14 * scale, Math.PI, 0);
-  beanie.fill(0x3498db);
-  beanie.circle(0, bodyTop - 4, 3);
-  beanie.fill(0xe74c3c);
-  container.addChild(beanie);
-
-  // Propeller blades (will animate)
-  const propeller = new Graphics();
-  container.addChild(propeller);
 
   // Blood layer – sits above body but below bubbles so blood never covers letters
   const bloodContainer = new Container();
@@ -531,35 +670,27 @@ function createMonster(word) {
     lt.anchor.set(0.5);
     lt.x = bx;
     lt.y = bubbleY;
+    lt._bubble = bubble;
     container.addChild(lt);
     letterTexts.push(lt);
   }
 
-  return { container, propeller, bloodContainer, word, letterTexts, hitIndex: 0, beanieY: bodyTop, propScale: scale };
+  return { container, propeller: null, bloodContainer, word, letterTexts, hitIndex: 0 };
 }
 
-function drawPropeller(propeller, tick, beanieY, scale) {
-  propeller.clear();
-  const angle = tick * 0.4;
-  const by = beanieY ?? -20;
-  const s = scale ?? 1;
-  const len = 16 * s;
-  // Two blades
-  for (let i = 0; i < 2; i++) {
-    const a = angle + i * Math.PI;
-    const dx = Math.cos(a) * len;
-    const dy = Math.sin(a) * 3;
-    propeller.moveTo(-dx, by - 4 - dy);
-    propeller.lineTo(dx, by - 4 + dy);
-    propeller.stroke({ width: 3, color: 0x95a5a6 });
-  }
-}
 
 function addMonsterBlood(m) {
   const letterCount = m.word.length;
-  const bodyHalfW = 18 + (letterCount - 1) * 10;
-  const bodyH = 38 + (letterCount - 1) * 6;
-  const bodyTop = -16 - (letterCount - 1) * 3;
+  const px = 3;
+  // Match pixel art grid widths per tier
+  const gridWidths = { 1: 17, 2: 19, 3: 21, 4: 23, 5: 23 };
+  const gridHeights = { 1: 16, 2: 18, 3: 20, 4: 21, 5: 22 };
+  const tops = { 1: -28, 2: -32, 3: -36, 4: -38, 5: -40 };
+  const w = gridWidths[letterCount] || 17;
+  const h = gridHeights[letterCount] || 16;
+  const bodyHalfW = (w * px) / 2;
+  const bodyH = h * px;
+  const bodyTop = tops[letterCount] || -28;
   const bubbleY = 14;
   const bubbleR = 13; // bubble radius + margin
   const spacing = 22;
@@ -1567,7 +1698,6 @@ app.ticker.add((ticker) => {
   for (let i = monsters.length - 1; i >= 0; i--) {
     const m = monsters[i];
 
-    if (m.propeller) drawPropeller(m.propeller, tick, m.beanieY, m.propScale);
 
     if (m.dying) {
       // Fall down
