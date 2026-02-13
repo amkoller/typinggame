@@ -395,40 +395,82 @@ function stopMusic() {
 // ── Draw helpers ───────────────────────────────────────────
 
 function drawOctopus(container) {
-  const body = new Graphics();
-  // Head / body – green oval
-  body.ellipse(0, 0, 28, 22);
-  body.fill(0x2ecc71);
-  // Eyes
-  body.circle(-10, -6, 5);
-  body.circle(10, -6, 5);
-  body.fill(0xffffff);
-  body.circle(-10, -6, 2.5);
-  body.circle(10, -6, 2.5);
-  body.fill(0x111111);
-  // Smile
-  body.arc(0, 4, 8, 0.1, Math.PI - 0.1);
-  body.stroke({ width: 2, color: 0x111111 });
+  const g = new Graphics();
+  const px = 3;
 
-  container.addChild(body);
+  // 20-wide × 20-tall pixel grid — retro octopus
+  const data = [
+    "      GGGGGGGG      ",
+    "    GGGGGGGGGGGG    ",
+    "   GGGGGGGGGGGGGG   ",
+    "  GGGWWGGGGGWWGGGG  ",
+    "  GGWPPWGGGGWPPWGG  ",
+    "  GGGWWGGGGGWWGGGG  ",
+    "  GGGGGGGGGGGGGGGG  ",
+    "  GGGGGGGGGGGGGGGG  ",
+    "  GGGGGMMMMMGGGGG   ",
+    "   GGGGGGGGGGGGGG   ",
+    "    GGGGGGGGGGGG    ",
+    "   GG GG GG GG GG  ",
+    "  GG  GG GG GG  GG ",
+    "  G   GG GG GG   G ",
+    "      GG GG GG      ",
+    "      G   G   G     ",
+  ];
 
-  // Tentacles (4 pairs dangling below)
-  const tentacles = new Graphics();
-  for (let i = -3; i <= 3; i += 2) {
-    const tx = i * 7;
-    tentacles.moveTo(tx, 18);
-    tentacles.bezierCurveTo(tx - 4, 34, tx + 4, 40, tx, 50);
-    tentacles.stroke({ width: 3, color: 0x27ae60 });
+  const colors = {
+    G: 0x00aa00, W: 0xffffff, P: 0x000000, M: 0x005500,
+  };
+  const halfW = (data[0].length * px) / 2;
+  const top = -24;
+
+  for (let r = 0; r < data.length; r++) {
+    for (let c = 0; c < data[r].length; c++) {
+      const ch = data[r][c];
+      if (ch === " ") continue;
+      g.rect(c * px - halfW, top + r * px, px, px);
+      g.fill(colors[ch]);
+    }
   }
-  container.addChild(tentacles);
 
-  // Jetpack – a little rectangle on the back
-  const jetpack = new Graphics();
-  jetpack.roundRect(-38, -14, 14, 28, 3);
-  jetpack.fill(0x7f8c8d);
-  jetpack.roundRect(-36, -10, 10, 24, 2);
-  jetpack.fill(0x95a5a6);
-  container.addChild(jetpack);
+  container.addChild(g);
+
+  // Compact jetpack — pixel art, tight against back
+  const jp = new Graphics();
+  const jpx = -halfW - 6;
+  const jpy = top + 6 * px;
+  // Main body (3×5 pixels)
+  for (let r = 0; r < 5; r++) {
+    for (let c = 0; c < 3; c++) {
+      jp.rect(jpx + c * px, jpy + r * px, px, px);
+      jp.fill(r === 0 || r === 4 ? 0x555555 : 0x888888);
+    }
+  }
+  // Nozzle (1×2 pixels)
+  jp.rect(jpx + px, jpy + 5 * px, px, px * 2);
+  jp.fill(0x555555);
+  container.addChild(jp);
+
+  // Ninja sword — handle at bottom-left (on back), blade pointing up-right toward monsters
+  const sw = new Graphics();
+  const bladeColors = [0xcccccc, 0xdddddd, 0xeeeeee, 0xffffff, 0xeeeeee, 0xdddddd, 0xcccccc, 0xbbbbbb];
+  const swordStartX = -halfW + 2;
+  const swordStartY = top + 12 * px;
+  for (let i = 0; i < bladeColors.length; i++) {
+    sw.rect(swordStartX + i * px, swordStartY - i * px, px, px);
+    sw.fill(bladeColors[i]);
+  }
+  // Handle wrap (brown/red pixels at bottom of blade)
+  sw.rect(swordStartX - px, swordStartY + px, px, px);
+  sw.fill(0x884400);
+  sw.rect(swordStartX - 2 * px, swordStartY + 2 * px, px, px);
+  sw.fill(0xaa0000);
+  // Guard (cross piece)
+  sw.rect(swordStartX + px, swordStartY + px, px, px);
+  sw.fill(0xaaaa00);
+  sw.rect(swordStartX - px, swordStartY - px, px, px);
+  sw.fill(0xaaaa00);
+  container.addChild(sw);
 
   // Jetpack flame (will be animated)
   const flame = new Graphics();
@@ -438,19 +480,20 @@ function drawOctopus(container) {
 
 function drawFlame(flame, tick) {
   flame.clear();
-  const flicker = Math.sin(tick * 0.3) * 4;
+  const px = 3;
+  const halfW = (20 * px) / 2;
+  const jpx = -halfW - 6 + px;
+  const baseY = -24 + 6 * px + 5 * px + px * 2;
+  const flicker = Math.sin(tick * 0.3) * px;
   // Outer flame
-  flame.moveTo(-35, 16);
-  flame.lineTo(-28, 16);
-  flame.lineTo(-31.5, 30 + flicker);
-  flame.closePath();
-  flame.fill(0xe74c3c);
+  flame.rect(jpx - px * 0.5, baseY, px * 2, px + flicker);
+  flame.fill(0xff0000);
+  // Mid flame
+  flame.rect(jpx, baseY + px, px, px + flicker * 0.5);
+  flame.fill(0xff6600);
   // Inner flame
-  flame.moveTo(-34, 16);
-  flame.lineTo(-29, 16);
-  flame.lineTo(-31.5, 24 + flicker * 0.5);
-  flame.closePath();
-  flame.fill(0xf39c12);
+  flame.rect(jpx, baseY, px, px * 0.6 + flicker * 0.3);
+  flame.fill(0xffaa00);
 }
 
 function createMonster(word) {
