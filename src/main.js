@@ -17,7 +17,7 @@ document.body.appendChild(app.canvas);
 // ── Constants ──────────────────────────────────────────────
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const LETTER_SETS = [
-  { name: "Beginner", letters: "ASDFJKLERUIGH" },
+  { name: "Beginner", letters: "SDFJKLERUIGH" },
   { name: "Apprentice", letters: "ASDFJKLERUIGHCVBN" },
   { name: "Journeyman", letters: "ASDFJKLERUIGHCVBNMOPW" },
   { name: "Master", letters: LETTERS },
