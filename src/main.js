@@ -299,6 +299,45 @@ function playLoseLife() {
   osc2.stop(t + 0.3);
 }
 
+function playExtraLife() {
+  if (!soundEnabled) return;
+  const t = audioCtx.currentTime;
+  // Ascending major arpeggio — bright and rewarding
+  const notes = [523, 659, 784, 1047]; // C5, E5, G5, C6
+  for (let i = 0; i < notes.length; i++) {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.type = "square";
+    osc.frequency.setValueAtTime(notes[i], t + i * 0.08);
+    gain.gain.setValueAtTime(0.12, t + i * 0.08);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + i * 0.08 + 0.15);
+    osc.start(t + i * 0.08);
+    osc.stop(t + i * 0.08 + 0.15);
+  }
+}
+
+let floatingTexts = [];
+
+function spawnFloatingText(x, y, message, color) {
+  const ft = new Text({
+    text: message,
+    style: new TextStyle({
+      fontFamily: "monospace",
+      fontSize: 24,
+      fontWeight: "bold",
+      fill: color,
+    }),
+    resolution: 4,
+  });
+  ft.anchor.set(0.5);
+  ft.x = x;
+  ft.y = y;
+  app.stage.addChild(ft);
+  floatingTexts.push({ gfx: ft, life: 1, decay: 0.015 });
+}
+
 // ── Music (8-bit chiptune) ────────────────────────────────
 let musicPlaying = false;
 let musicStep = 0;
@@ -1815,9 +1854,11 @@ function restartGame() {
   for (const m of monsters) app.stage.removeChild(m.container);
   for (const b of bullets) app.stage.removeChild(b.gfx);
   for (const p of bloodParticles) app.stage.removeChild(p.gfx);
+  for (const ft of floatingTexts) app.stage.removeChild(ft.gfx);
   monsters = [];
   bullets = [];
   bloodParticles = [];
+  floatingTexts = [];
   score = 0;
   levelKills = 0;
   monsterSpawnCount = 0;
@@ -1986,6 +2027,8 @@ app.ticker.add((ticker) => {
           killPoints = 250;
           lives++;
           livesText.text = `Lives: ${lives}`;
+          playExtraLife();
+          spawnFloatingText(t.container.x, t.container.y - 40, "+1 LIFE", 0x00ff00);
         } else {
           killPoints = t.isBoss ? level * 20 : (pointTable[wordLen] || wordLen * 10);
         }
@@ -2037,6 +2080,18 @@ app.ticker.add((ticker) => {
     ) {
       app.stage.removeChild(b.gfx);
       bullets.splice(i, 1);
+    }
+  }
+
+  // Update floating texts
+  for (let i = floatingTexts.length - 1; i >= 0; i--) {
+    const ft = floatingTexts[i];
+    ft.gfx.y -= 1.5 * dt;
+    ft.life -= ft.decay * dt;
+    ft.gfx.alpha = ft.life;
+    if (ft.life <= 0) {
+      app.stage.removeChild(ft.gfx);
+      floatingTexts.splice(i, 1);
     }
   }
 
