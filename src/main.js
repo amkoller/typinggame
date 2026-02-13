@@ -17,7 +17,7 @@ document.body.appendChild(app.canvas);
 // ── Constants ──────────────────────────────────────────────
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const LETTER_SETS = [
-  { name: "Beginner", letters: "SDFJKLERUIGH" },
+  { name: "Beginner", letters: "ASDFJKLERUIGH" },
   { name: "Apprentice", letters: "ASDFJKLERUIGHCVBN" },
   { name: "Journeyman", letters: "ASDFJKLERUIGHCVBNMOPW" },
   { name: "Master", letters: LETTERS },
@@ -266,6 +266,36 @@ function playKill() {
     osc.start(t);
     osc.stop(t + 0.2);
   }
+}
+
+function playLoseLife() {
+  if (!soundEnabled) return;
+  const t = audioCtx.currentTime;
+  // Descending minor third — alarming two-tone drop
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.type = "square";
+  osc.frequency.setValueAtTime(180, t);
+  osc.frequency.setValueAtTime(130, t + 0.12);
+  gain.gain.setValueAtTime(0.15, t);
+  gain.gain.setValueAtTime(0.12, t + 0.12);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+  osc.start(t);
+  osc.stop(t + 0.35);
+  // Low rumble underneath
+  const osc2 = audioCtx.createOscillator();
+  const gain2 = audioCtx.createGain();
+  osc2.connect(gain2);
+  gain2.connect(audioCtx.destination);
+  osc2.type = "sawtooth";
+  osc2.frequency.setValueAtTime(55, t);
+  osc2.frequency.exponentialRampToValueAtTime(25, t + 0.3);
+  gain2.gain.setValueAtTime(0.1, t);
+  gain2.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+  osc2.start(t);
+  osc2.stop(t + 0.3);
 }
 
 // ── Music (8-bit chiptune) ────────────────────────────────
@@ -1853,6 +1883,7 @@ app.ticker.add((ticker) => {
         } else {
           lives--;
         }
+        playLoseLife();
         livesText.text = `Lives: ${lives}`;
         app.stage.removeChild(m.container);
         monsters.splice(i, 1);
