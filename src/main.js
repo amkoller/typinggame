@@ -17,7 +17,7 @@ document.body.appendChild(app.canvas);
 // ── Constants ──────────────────────────────────────────────
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const MONSTER_SPEED = 1.2;
-const SPAWN_INTERVAL = 2000; // ms
+const SPAWN_INTERVAL = 1000; // ms
 const PLAYER_X = 100;
 const MAX_LEVEL = 60;
 const BOSS_LEVELS = {
@@ -177,7 +177,7 @@ let bossActive = false;
 
 function getSpawnInterval() {
   // 2000ms at level 1, decreasing by 25ms per level, min 550ms
-  return Math.max(550, SPAWN_INTERVAL - (level - 1) * 25);
+  return Math.max(550, SPAWN_INTERVAL - (level - 1) * 10);
 }
 
 function getAvgLettersPerMonster() {
