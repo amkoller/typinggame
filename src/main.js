@@ -10,6 +10,7 @@ await app.init({
   roundPixels: true,
   resolution: window.devicePixelRatio || 1,
   autoDensity: true,
+  preference: "webgl",
 });
 
 document.body.appendChild(app.canvas);
