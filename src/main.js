@@ -23,16 +23,16 @@ const LETTER_SETS = [
   { name: "Master", letters: LETTERS },
 ];
 const MONSTER_SPEED = 1.2;
-const SPAWN_INTERVAL = 1000; // ms
+const SPAWN_INTERVAL = 1250; // ms
 const BASE_BULLET_SPEED = 28;
 const PLAYER_X = 100;
 const MAX_LEVEL = 60;
 const BOSS_LEVELS = {
   10: { type: "skeleton", name: "SKELETON", wordCount: 7, wordLen: 3, speed: 1.8 },
-  20: { type: "ghost", name: "GHOST", wordCount: 8, wordLen: 4, speed: 1.5 },
-  30: { type: "shark", name: "LASER SHARK", wordCount: 12, wordLen: 4, speed: 1.2 },
-  40: { type: "demon", name: "FIRE DEMON", wordCount: 15, wordLen: 5, speed: 0.9 },
-  50: { type: "skull", name: "ZOMBIE SKULL", wordCount: 20, wordLen: 5, speed: 0.6 },
+  20: { type: "ghost", name: "GHOST", wordCount: 8, wordLen: 4, speed: 1.6 },
+  30: { type: "shark", name: "LASER SHARK", wordCount: 12, wordLen: 4, speed: 1.4 },
+  40: { type: "demon", name: "FIRE DEMON", wordCount: 15, wordLen: 5, speed: 1.2 },
+  50: { type: "skull", name: "ZOMBIE SKULL", wordCount: 20, wordLen: 5, speed: 1.0 },
 };
 
 // Real English words for boss encounters
@@ -187,7 +187,7 @@ let monsterSpawnCount = 0;
 
 function getSpawnInterval() {
   // 2000ms at level 1, decreasing by 25ms per level, min 550ms
-  return Math.max(700, SPAWN_INTERVAL - (level - 1) * 5);
+  return Math.max(700, SPAWN_INTERVAL - (level - 1) * 6);
 }
 
 function getAvgLettersPerMonster() {
@@ -533,9 +533,9 @@ function drawOctopus(container) {
     "      GGGGGGGG      ",
     "    GGGGGGGGGGGG    ",
     "   GGGGGGGGGGGGGG   ",
-    "  GGGWWGGGGGWWGGGG  ",
+    "  GGGWWGGGGGGWWGGG  ",
     "  GGWPPWGGGGWPPWGG  ",
-    "  GGGWWGGGGGWWGGGG  ",
+    "  GGGWWGGGGGGWWGGG  ",
     "  GGGGGGGGGGGGGGGG  ",
     "  GGGGGGGGGGGGGGGG  ",
     "  GGGGGMMMMMGGGGG   ",
@@ -581,26 +581,7 @@ function drawOctopus(container) {
   jp.fill(0x555555);
   container.addChild(jp);
 
-  // Ninja sword — handle at bottom-left (on back), blade pointing up-right toward monsters
-  const sw = new Graphics();
-  const bladeColors = [0xcccccc, 0xdddddd, 0xeeeeee, 0xffffff, 0xeeeeee, 0xdddddd, 0xcccccc, 0xbbbbbb];
-  const swordStartX = -halfW + 2;
-  const swordStartY = top + 12 * px;
-  for (let i = 0; i < bladeColors.length; i++) {
-    sw.rect(swordStartX + i * px, swordStartY - i * px, px, px);
-    sw.fill(bladeColors[i]);
-  }
-  // Handle wrap (brown/red pixels at bottom of blade)
-  sw.rect(swordStartX - px, swordStartY + px, px, px);
-  sw.fill(0x884400);
-  sw.rect(swordStartX - 2 * px, swordStartY + 2 * px, px, px);
-  sw.fill(0xaa0000);
-  // Guard (cross piece)
-  sw.rect(swordStartX + px, swordStartY + px, px, px);
-  sw.fill(0xaaaa00);
-  sw.rect(swordStartX - px, swordStartY - px, px, px);
-  sw.fill(0xaaaa00);
-  container.addChild(sw);
+
 
   // Jetpack flame (will be animated)
   const flame = new Graphics();
@@ -1305,19 +1286,38 @@ function createBoss(bossConfig) {
   const fullWord = words.join(" ");
 
   // Layout letter bubbles in rows below the boss body
+  // Break into rows at word boundaries — each row ends with a space (except the last)
   const bubbleSpacing = 20;
   const maxPerRow = 14;
   const bubbleStartY = 55;
   const letterTexts = [];
   const bubblePositions = []; // for blood avoidance
 
+  // Pre-compute row breaks: pack words greedily, break before a word that would exceed maxPerRow
+  const rows = [];
+  let rowStart = 0;
+  while (rowStart < fullWord.length) {
+    let rowEnd = Math.min(rowStart + maxPerRow, fullWord.length);
+    // If we're not at the end and the cut lands inside a word, back up to the last space
+    if (rowEnd < fullWord.length && fullWord[rowEnd] !== " " && fullWord[rowEnd - 1] !== " ") {
+      const lastSpace = fullWord.lastIndexOf(" ", rowEnd - 1);
+      if (lastSpace > rowStart) rowEnd = lastSpace + 1; // include the space at end of row
+    }
+    rows.push({ start: rowStart, end: rowEnd });
+    rowStart = rowEnd;
+  }
+
   for (let i = 0; i < fullWord.length; i++) {
-    // Determine row and column
-    const row = Math.floor(i / maxPerRow);
-    const rowStart = row * maxPerRow;
-    const rowEnd = Math.min(rowStart + maxPerRow, fullWord.length);
-    const rowLen = rowEnd - rowStart;
-    const col = i - rowStart;
+    // Find which row this character belongs to
+    let row = 0, rowLen = 0, col = 0;
+    for (let r = 0; r < rows.length; r++) {
+      if (i >= rows[r].start && i < rows[r].end) {
+        row = r;
+        rowLen = rows[r].end - rows[r].start;
+        col = i - rows[r].start;
+        break;
+      }
+    }
 
     const totalRowW = (rowLen - 1) * bubbleSpacing;
     const bx = -totalRowW / 2 + col * bubbleSpacing;
