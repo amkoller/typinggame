@@ -1,19 +1,29 @@
+console.log("[typing-game] script start");
 import { Application, Graphics, Text, TextStyle, Container } from "pixi.js";
 import substrings from "./words.json";
 
+console.log("[typing-game] imports loaded, words:", Object.keys(substrings).length);
+
 const app = new Application();
 
-await app.init({
-  resizeTo: window,
-  backgroundColor: 0x1a1a2e,
-  antialias: true,
-  roundPixels: true,
-  resolution: window.devicePixelRatio || 1,
-  autoDensity: true,
-  preference: "webgl",
-});
+console.log("[typing-game] calling app.init...");
+try {
+  await app.init({
+    resizeTo: window,
+    backgroundColor: 0x1a1a2e,
+    antialias: true,
+    roundPixels: true,
+    resolution: window.devicePixelRatio || 1,
+    autoDensity: true,
+    preference: "webgl",
+  });
+  console.log("[typing-game] app.init done, canvas:", app.canvas);
+} catch (e) {
+  console.error("[typing-game] app.init FAILED:", e);
+}
 
 document.body.appendChild(app.canvas);
+console.log("[typing-game] canvas appended to body");
 
 // ── Constants ──────────────────────────────────────────────
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
