@@ -1495,6 +1495,10 @@ soundText.x = app.screen.width - 14;
 soundText.y = 14;
 app.stage.addChild(soundText);
 
+// Overlay container for full-screen messages (always on top)
+const overlay = new Container();
+app.stage.addChild(overlay);
+
 const gameOverText = new Text({
   text: "GAME OVER\nPress Enter to restart",
   style: new TextStyle({
@@ -1508,7 +1512,7 @@ gameOverText.anchor.set(0.5);
 gameOverText.x = app.screen.width / 2;
 gameOverText.y = app.screen.height / 2;
 gameOverText.visible = false;
-app.stage.addChild(gameOverText);
+overlay.addChild(gameOverText);
 
 const winText = new Text({
   text: "YOU WIN!\nPress Enter to restart",
@@ -1523,7 +1527,7 @@ winText.anchor.set(0.5);
 winText.x = app.screen.width / 2;
 winText.y = app.screen.height / 2;
 winText.visible = false;
-app.stage.addChild(winText);
+overlay.addChild(winText);
 
 const pauseText = new Text({
   text: "PAUSED\nPress Enter to resume",
@@ -1538,7 +1542,7 @@ pauseText.anchor.set(0.5);
 pauseText.x = app.screen.width / 2;
 pauseText.y = app.screen.height / 2;
 pauseText.visible = false;
-app.stage.addChild(pauseText);
+overlay.addChild(pauseText);
 
 // ── Spawning ───────────────────────────────────────────────
 function getWordLength() {
@@ -1738,6 +1742,8 @@ window.addEventListener("keydown", (e) => {
     const wasPaused = paused;
     paused = true;
     pauseText.visible = true;
+    for (const m of monsters) m.container.visible = false;
+    for (const b of bullets) b.gfx.visible = false;
     stopMusic();
     const input = prompt("Enter a starting level (1-60):");
     if (input !== null) {
@@ -1756,6 +1762,8 @@ window.addEventListener("keydown", (e) => {
     // Restore previous pause state if cancelled or invalid
     paused = wasPaused;
     pauseText.visible = wasPaused;
+    for (const m of monsters) m.container.visible = !wasPaused;
+    for (const b of bullets) b.gfx.visible = !wasPaused;
     if (!wasPaused && soundEnabled) startMusic();
     return;
   }
@@ -1763,6 +1771,8 @@ window.addEventListener("keydown", (e) => {
   if (e.code === "Enter") {
     paused = !paused;
     pauseText.visible = paused;
+    for (const m of monsters) m.container.visible = !paused;
+    for (const b of bullets) b.gfx.visible = !paused;
     if (paused) stopMusic();
     else if (soundEnabled) startMusic();
     return;
