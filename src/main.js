@@ -324,8 +324,8 @@ function spawnFloatingText(x, y, message, color) {
   const ft = new Text({
     text: message,
     style: new TextStyle({
-      fontFamily: "monospace",
-      fontSize: 24,
+      fontFamily: "'Press Start 2P', monospace",
+      fontSize: 14,
       fontWeight: "bold",
       fill: color,
     }),
@@ -814,7 +814,7 @@ function createMonster(word) {
     const lt = new Text({
       text: word[i],
       style: new TextStyle({
-        fontFamily: "Arial",
+        fontFamily: "'Roboto Slab', serif",
         fontSize: 14,
         fontWeight: "bold",
         fill: 0x2c3e50,
@@ -1334,7 +1334,7 @@ function createBoss(bossConfig) {
       const spaceLbl = new Text({
         text: "·",
         style: new TextStyle({
-          fontFamily: "monospace",
+          fontFamily: "'Press Start 2P', monospace",
           fontSize: 14,
           fontWeight: "bold",
           fill: 0xffdd00,
@@ -1359,7 +1359,7 @@ function createBoss(bossConfig) {
       const lt = new Text({
         text: fullWord[i],
         style: new TextStyle({
-          fontFamily: "Arial",
+          fontFamily: "'Roboto Slab', serif",
           fontSize: 13,
           fontWeight: "bold",
           fill: 0x2c3e50,
@@ -1380,8 +1380,8 @@ function createBoss(bossConfig) {
   const nameLabel = new Text({
     text: name,
     style: new TextStyle({
-      fontFamily: "monospace",
-      fontSize: 16,
+      fontFamily: "'Press Start 2P', monospace",
+      fontSize: 10,
       fontWeight: "bold",
       fill: 0xff4444,
     }),
@@ -1460,8 +1460,8 @@ app.stage.addChild(player);
 
 // ── Score / Lives UI ───────────────────────────────────────
 const uiStyle = new TextStyle({
-  fontFamily: "monospace",
-  fontSize: 20,
+  fontFamily: "'Press Start 2P', monospace",
+  fontSize: 12,
   fill: 0xecf0f1,
 });
 const scoreText = new Text({ text: "Score: 0", style: uiStyle });
@@ -1502,8 +1502,8 @@ app.stage.addChild(overlay);
 const gameOverText = new Text({
   text: "GAME OVER\nPress Enter to restart",
   style: new TextStyle({
-    fontFamily: "monospace",
-    fontSize: 42,
+    fontFamily: "'Press Start 2P', monospace",
+    fontSize: 24,
     fill: 0xe74c3c,
     align: "center",
   }),
@@ -1517,8 +1517,8 @@ overlay.addChild(gameOverText);
 const winText = new Text({
   text: "YOU WIN!\nPress Enter to restart",
   style: new TextStyle({
-    fontFamily: "monospace",
-    fontSize: 42,
+    fontFamily: "'Press Start 2P', monospace",
+    fontSize: 24,
     fill: 0x2ecc71,
     align: "center",
   }),
@@ -1532,8 +1532,8 @@ overlay.addChild(winText);
 const pauseText = new Text({
   text: "PAUSED\nPress Enter to resume",
   style: new TextStyle({
-    fontFamily: "monospace",
-    fontSize: 42,
+    fontFamily: "'Press Start 2P', monospace",
+    fontSize: 24,
     fill: 0xecf0f1,
     align: "center",
   }),
@@ -1686,8 +1686,8 @@ function spawnBlood(x, y, count) {
 const stunText = new Text({
   text: "STUNNED!",
   style: new TextStyle({
-    fontFamily: "monospace",
-    fontSize: 24,
+    fontFamily: "'Press Start 2P', monospace",
+    fontSize: 14,
     fill: 0xe74c3c,
     fontWeight: "bold",
   }),
